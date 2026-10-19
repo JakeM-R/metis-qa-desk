@@ -232,7 +232,7 @@ footer p { margin: 0; max-width: 90ch; }
       <button class="primary" id="run">QA the batch</button>
       <label class="filebtn">Upload CSV<input type="file" id="file" accept=".csv,text/csv,text/plain"></label>
       <button id="template">CSV template</button>
-      <button id="loadDemo">Demo batch</button>
+      <button id="loadDemo">Reset demo</button>
       <span class="status" id="status" role="status" aria-live="polite"></span>
     </div>
     <div id="err" class="error" hidden></div>
@@ -318,7 +318,7 @@ footer p { margin: 0; max-width: 90ch; }
   </div>
 
   <div id="panelTracker" class="panel" role="tabpanel" aria-labelledby="tabTracker" hidden>
-    <div id="demoBar" class="demo-bar" hidden><span>Demo data: synthetic batches, clients and labellers.</span><button id="clearDemo">Clear demo</button></div>
+    <div id="demoBar" class="demo-bar"><span id="demoText"></span><button id="clearDemo">Clear demo</button><button id="restoreDemo">Load demo batches</button></div>
 
     <section aria-label="Weekly note">
       <details class="fold">
@@ -1180,7 +1180,12 @@ Reference
   const TEMPLATE = Q.toCSV([["task_id", "batch", "labeller", "labelled_on", "output"], ...D.tasks.slice(0, 1).map((t) => [t.task_id, t.batch, t.labeller, t.labelled_on, t.output])]);
   $("template").addEventListener("click", () => download("qa-desk-template.csv", TEMPLATE + "\n"));
   function loadDemo() { $("spec").value = D.spec; $("batch").value = D.csv; setDemo(true); }
-  $("loadDemo").addEventListener("click", () => { loadDemo(); run(); });
+  // Reset demo puts both tabs back: the demo batch on this tab and the demo batches in the tracker.
+  $("loadDemo").addEventListener("click", () => {
+    loadDemo(); run(); restoreDemo();
+    $("status").textContent = "Demo reset: batch B-07 rescored and the demo batches are back in the tracker.";
+    $("batchSec").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   $("spec").addEventListener("input", () => setDemo(false));
   $("batch").addEventListener("input", () => setDemo(false));
   $("file").addEventListener("change", async (e) => {
@@ -1329,10 +1334,12 @@ Reference
     const now = Date.now(), items = trk.items, pace = T.defaultPace(items, now);
     const demo = items.some((b) => b.demo);
     $("trackerCount").textContent = `(${items.filter(T.active).length})`;
-    $("demoBar").hidden = !demo;
+    $("demoText").textContent = demo ? "Demo data: synthetic batches, clients and labellers." : "No demo batches loaded.";
+    $("clearDemo").hidden = !demo;
+    $("restoreDemo").hidden = demo;
     document.querySelectorAll(".trk-demo").forEach((e) => (e.hidden = !demo));
     renderHeadline();
-    $("note").textContent = items.length ? T.note(items, now, demo) : "No batches yet. Add one below, or send a QA result from the first tab.";
+    $("note").textContent = items.length ? T.note(items, now, demo) : "No batches yet. Load the demo batches above, add one below, or send a QA result from the first tab.";
 
     const bn = T.bottlenecks(items, now);
     $("attention").innerHTML = bn.length
@@ -1351,7 +1358,7 @@ Reference
         <td class="n fig">${pct(m.passRate)}</td><td class="n">${pct(m.reworkRate)}</td><td class="n">${T.money(m.cost)}</td><td class="n fig">${m.perAccepted ? T.money2(m.perAccepted) : "–"}</td>
         <td>${T.fmtDay(m.deadline)}<span class="tagline"><span class="badge ${m.status}">${STATUS[m.status]}</span></span></td>
         <td><button class="${armed ? "" : "link"}" data-remove="${esc(b.id)}">${armed ? "Confirm remove" : "Remove"}</button></td></tr>`;
-    }).join("") : `<tr><td colspan="10" class="empty">No batches yet.</td></tr>`;
+    }).join("") : `<tr><td colspan="10" class="empty">No batches yet. Use “Load demo batches” above, or add one below.</td></tr>`;
 
     const labs = T.labellers(items, now);
     $("labTrkBody").innerHTML = labs.length ? labs.map((l) => `<tr><td><b>${esc(l.name)}</b></td><td class="n">${l.tasks}</td><td class="n">${l.perDay.toFixed(1)}</td><td class="n fig">${pct(l.passRate)}</td><td class="n">${pct(l.reworkRate)}</td><td class="n">${T.money(l.cost)}</td><td>${l.topIssue ? esc(l.topIssue) : `<span class="hint">none</span>`}</td></tr>`).join("")
@@ -1370,6 +1377,13 @@ Reference
     renderTracker();
   });
   $("clearDemo").addEventListener("click", () => { trk.items = trk.items.filter((b) => !b.demo); save(); renderTracker(); });
+  // Brings the demo batches back next to anything added by hand; a batch you added keeps its ID.
+  function restoreDemo() {
+    const mine = trk.items.filter((b) => !b.demo);
+    trk.items = [...mine, ...T.demo(Date.now()).filter((d) => !mine.some((b) => b.id === d.id))];
+    save(); renderTracker();
+  }
+  $("restoreDemo").addEventListener("click", restoreDemo);
   $("copyNote").addEventListener("click", (e) => copyText($("note").textContent, e.currentTarget, "Copy note"));
   $("copyCsv").addEventListener("click", () => download("qa-desk-batches.csv", T.csv(trk.items, Date.now()) + "\n"));
   $("addId").addEventListener("input", (e) => e.target.setCustomValidity(""));
