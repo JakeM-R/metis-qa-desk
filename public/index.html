@@ -1,0 +1,1390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QA Desk</title>
+<meta name="description" content="QA for post-training data: scores each task output against the spec with the line behind every score, tracks batches on throughput, quality, cost and timeliness, and writes the weekly note. Runs entirely in the browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Manrope:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Look follows Metis's own site: warm off-white ground, a high-contrast serif for headings and key figures,
+   a light grotesk for everything else, olive as the single accent (dark text on it), square corners on controls,
+   softly rounded panels, and small square pixels as the recurring mark. Layout: one large headline row of the
+   three numbers leadership reads first, then working sections. Mono is kept for the trajectories themselves. */
+:root {
+  --bg: #fbfaf8;
+  --surface: #f2f1ee;
+  --line: #dcd9d3;
+  --ink: #141413;
+  --ink-2: #57554f;
+  --ink-3: #8a877f;
+  --accent: #5f6420;
+  --accent-fill: #c2c675;
+  --on-accent: #141413;
+  --accent-soft: #eef0d9;
+  --pixel: #c2c675;
+  --on-ink: #fbfaf8;
+  --good: #4b6b2e;
+  --good-soft: #e5ecd6;
+  --warn: #8a6118;
+  --warn-soft: #f3e8cf;
+  --bad: #a3392d;
+  --bad-soft: #f5dfda;
+  --font-display: "Newsreader", "Times New Roman", Georgia, serif;
+  --font-ui: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 0px;
+  --panel-radius: 18px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151513; --surface: #1d1d1a; --line: #33322d; --ink: #f1efe9; --ink-2: #b4b1a8; --ink-3: #85827a;
+    --accent: #c9cd80; --accent-fill: #c2c675; --on-accent: #141413; --accent-soft: #262718; --pixel: #8f9350; --on-ink: #151513;
+    --good: #9cbf7c; --good-soft: #1f2a19; --warn: #d6b06a; --warn-soft: #2c2619; --bad: #e08a7e; --bad-soft: #2f1d1a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151513; --surface: #1d1d1a; --line: #33322d; --ink: #f1efe9; --ink-2: #b4b1a8; --ink-3: #85827a;
+  --accent: #c9cd80; --accent-fill: #c2c675; --on-accent: #141413; --accent-soft: #262718; --pixel: #8f9350; --on-ink: #151513;
+  --good: #9cbf7c; --good-soft: #1f2a19; --warn: #d6b06a; --warn-soft: #2c2619; --bad: #e08a7e; --bad-soft: #2f1d1a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 15px/1.6 var(--font-ui); }
+.wrap {
+  max-width: 1100px; margin: 0 auto;
+  padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 36px;
+}
+header { display: grid; gap: 10px; }
+header { position: relative; padding-top: 22px; }
+header::before { content: ""; position: absolute; top: 0; left: 0; width: 46px; height: 10px;
+  background: linear-gradient(90deg, var(--pixel) 0 10px, transparent 10px 18px, var(--ink) 18px 28px, transparent 28px 36px, var(--pixel) 36px 46px); }
+header h1 { font: 400 52px/1.02 var(--font-display); letter-spacing: -0.025em; margin: 0; }
+header p { margin: 0; color: var(--ink-2); max-width: 66ch; font-size: 17px; font-weight: 300; }
+.byline { font-size: 13px; color: var(--ink-3); }
+
+/* Headline: the three numbers, large, with a hairline between them. */
+.headline-row { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.headline-row > div { padding: 18px 20px 18px 0; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.headline-row > div + div { padding-left: 20px; border-left: 1px solid var(--line); }
+.headline-row .k { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-3); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.headline-row .v { font: 400 44px/1.05 var(--font-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.headline-row .v.risk { color: var(--bad); }
+.headline-row .k::before { content: ""; width: 7px; height: 7px; background: var(--pixel); }
+.headline-row .s { font-size: 13px; color: var(--ink-2); }
+
+section { display: grid; gap: 14px; min-width: 0; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-3); font-weight: 500; margin: 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+h3 { font: 400 26px/1.2 var(--font-display); margin: 0; letter-spacing: -0.015em; }
+.grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 20px; }
+.grid > * { min-width: 0; display: grid; gap: 8px; align-content: start; }
+label.field { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hint { font-weight: 400; color: var(--ink-3); font-size: 13px; text-transform: none; letter-spacing: 0; }
+textarea {
+  width: 100%; min-height: 340px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  font: 12.5px/1.55 var(--font-mono); color: var(--ink); background: #fff; resize: vertical;
+}
+textarea:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, tr:focus-visible, .filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) textarea { background: var(--surface); } }
+:root[data-theme="dark"] textarea { background: var(--surface); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+button, .filebtn {
+  font: 500 13px/1.2 var(--font-ui); letter-spacing: 0.02em; border-radius: var(--radius); border: 1px solid var(--line); background: transparent;
+  color: var(--ink); padding: 9px 14px; cursor: pointer; transition: border-color 140ms ease-out, filter 140ms ease-out;
+}
+button:hover, .filebtn:hover { border-color: var(--ink-3); }
+button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
+button.primary:hover { filter: brightness(0.95); }
+button.link { border: 0; padding: 0; background: none; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.filebtn { display: inline-flex; align-items: center; position: relative; }
+.filebtn input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.status { font-size: 13px; color: var(--ink-2); }
+.error { color: var(--bad); background: var(--bad-soft); padding: 10px 14px; border-radius: var(--radius); font-size: 14px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 3px 7px; border-radius: var(--radius); white-space: nowrap; text-transform: uppercase; letter-spacing: 0.06em; }
+.badge.demo { background: var(--warn-soft); color: var(--warn); }
+.badge.accept, .badge.on_track, .badge.on_time { background: var(--good-soft); color: var(--good); }
+.badge.rework { background: var(--warn-soft); color: var(--warn); }
+.badge.reject, .badge.at_risk, .badge.late { background: var(--bad-soft); color: var(--bad); }
+.badge.na { background: var(--bg); color: var(--ink-3); }
+.card { border: 0; background: var(--surface); border-radius: var(--panel-radius); padding: 24px; min-width: 0; display: grid; gap: 12px; align-content: start; }
+.flat { padding: 4px 8px; }
+.head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.summary { color: var(--ink-2); margin: 6px 0 0; max-width: 72ch; }
+.mean { font-size: 13px; color: var(--ink-3); text-align: right; display: grid; gap: 6px; justify-items: end; font-variant-numeric: tabular-nums; }
+.tablebox { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 500; padding: 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: 0; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.fig { font-family: var(--font-display); font-size: 16px; }
+td.axis { width: 24%; font-weight: 500; }
+td.axis small { display: block; font-weight: 400; color: var(--ink-3); font-size: 12px; }
+td.score { width: 104px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dots { display: inline-flex; gap: 3px; vertical-align: middle; }
+.dot { width: 9px; height: 9px; border-radius: 0; background: var(--line); }
+.dot.on { background: var(--ink); }
+.num { font: 400 16px var(--font-display); margin-left: 6px; }
+blockquote { margin: 0 0 6px; padding: 5px 10px; border-left: 3px solid var(--accent-fill); background: var(--bg); color: var(--ink); font: 12.5px/1.5 var(--font-mono); overflow-wrap: anywhere; }
+blockquote.neg { border-color: var(--bad); background: var(--bad-soft); }
+.reason { color: var(--ink-2); font-size: 13px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+tr.pick { cursor: pointer; }
+tr.pick:hover td, tr.pick:focus-visible td, tr.pick.on td { background: var(--bg); }
+details { background: var(--surface); border-radius: var(--panel-radius); padding: 14px 20px; }
+details summary { cursor: pointer; font-weight: 500; }
+.axislist { margin: 12px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.axislist li { padding: 10px 0; border-top: 1px solid var(--line); display: grid; gap: 4px; }
+.kind { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+.stats { display: flex; gap: 28px; flex-wrap: wrap; }
+.stats div { display: grid; gap: 2px; }
+.stats .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); }
+.stats .v { font: 400 30px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+pre.note { margin: 0; white-space: pre-wrap; font: 14.5px/1.7 var(--font-ui); background: var(--bg); border-left: 3px solid var(--accent-fill); padding: 16px 18px; border-radius: var(--radius); }
+.attn { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; font-size: 14px; }
+.attn li { display: grid; gap: 4px; }
+.attn .top { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.attn .who { font-weight: 600; }
+.attn .meta { color: var(--ink-2); font-size: 13px; }
+.trk td { vertical-align: middle; }
+.trk select, .addform input {
+  font: 14px var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 9px;
+}
+.late-t { color: var(--warn); font-weight: 600; }
+.tagline { display: block; font-size: 12px; color: var(--ink-3); margin-top: 3px; }
+.addform { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.addform label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); }
+.addform input { width: 140px; }
+.empty { color: var(--ink-3); font-size: 14px; }
+.pb { display: grid; gap: 22px; }
+.pb section { gap: 10px; }
+.pb h4 { font: 400 20px var(--font-display); margin: 0; }
+.pb ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 14px; }
+.pb .sub { display: block; color: var(--ink-3); font-size: 13px; }
+.pb .pair { display: grid; gap: 4px; margin-top: 6px; }
+.pb .lab { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 10px 14px; color: var(--ink-2); font-weight: 500; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12.5px; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent-fill); }
+.tabs .count { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.panel { display: grid; gap: 36px; min-width: 0; }
+.demo-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--accent-soft); color: var(--ink); padding: 12px 16px; border-radius: var(--panel-radius); font-size: 14px; }
+footer { font-size: 13px; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 16px; display: grid; gap: 6px; }
+footer p { margin: 0; max-width: 90ch; }
+@media (max-width: 760px) {
+  .wrap { padding-block: 24px 56px; gap: 28px; }
+  header h1 { font-size: 40px; }
+  .grid, .two { grid-template-columns: 1fr; }
+  .headline-row { grid-template-columns: 1fr; }
+  .headline-row > div, .headline-row > div + div { padding: 14px 0; border-left: 0; }
+  .headline-row > div + div { border-top: 1px solid var(--line); }
+  .headline-row .v { font-size: 36px; }
+  .card { padding: 18px; border-radius: 14px; }
+  textarea { min-height: 220px; }
+  table.scores, table.scores tbody, table.scores tr, table.scores td { display: block; width: 100%; }
+  table.scores thead { display: none; }
+  table.scores tr { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  table.scores td { border: 0; padding: 4px 0; }
+  .mean { justify-items: start; text-align: left; }
+  .stats { gap: 18px; }
+}
+@media (max-width: 440px) { .tabs button { padding: 10px 8px; font-size: 11px; letter-spacing: 0.04em; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>QA Desk</h1>
+    <p>QA for post-training data. Paste a task spec and a batch of task outputs. It builds a rubric from the spec, scores every output with the line behind each score, and recommends accept, rework or reject. The tracker follows each batch from queue to delivery on throughput, quality, cost and timeliness, flags the bottleneck, and writes the weekly note for leadership.</p>
+    <div class="byline">Built by Jake Makking-Robinson for the Metis operations role. A working draft, not a Metis product and not affiliated with Metis. All data on this page is synthetic.</div>
+  </header>
+
+  <div class="headline-row" id="headline" aria-label="This week"></div>
+
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button role="tab" id="tabQa" aria-selected="true" aria-controls="panelQa">QA a batch</button>
+    <button role="tab" id="tabTracker" aria-selected="false" aria-controls="panelTracker">Batch tracker <span class="count" id="trackerCount"></span></button>
+  </nav>
+
+  <div id="panelQa" class="panel" role="tabpanel" aria-labelledby="tabQa">
+  <section aria-labelledby="h-inputs">
+    <h2 id="h-inputs">1 · Inputs <span class="badge demo qa-demo">Demo data</span></h2>
+    <div class="grid">
+      <div>
+        <label class="field" for="spec">Task spec <span class="hint">the labelling or eval guidelines</span></label>
+        <textarea id="spec" spellcheck="false"></textarea>
+      </div>
+      <div>
+        <label class="field" for="batch">Task outputs, as CSV <span class="hint">task_id, batch, labeller, labelled_on, output</span></label>
+        <textarea id="batch" spellcheck="false" placeholder="Paste a CSV, or load a file. One row per task; the output column holds the full trajectory."></textarea>
+        <div class="actions">
+          <label class="filebtn">Load CSV file<input type="file" id="file" accept=".csv,text/csv,text/plain"></label>
+          <button id="loadDemo">Reload demo batch</button>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="run">QA the batch</button>
+      <span class="status" id="status" role="status" aria-live="polite"></span>
+    </div>
+    <div id="err" class="error" hidden></div>
+  </section>
+
+  <section id="batchSec" hidden aria-labelledby="h-batch">
+    <h2 id="h-batch">2 · Batch result <span class="badge demo qa-demo">Demo data</span></h2>
+    <div class="card">
+      <div class="head">
+        <h3 id="bTitle"></h3>
+        <div class="actions"><button id="track">Send results to tracker</button><span class="status" id="trackMsg" role="status" aria-live="polite"></span></div>
+      </div>
+      <div class="stats" id="bStats"></div>
+      <p class="summary" id="bSummary" style="margin:0"></p>
+    </div>
+    <div class="card flat">
+      <div class="tablebox">
+        <table><thead><tr><th>Labeller</th><th class="n">Tasks</th><th class="n">Pass</th><th class="n">Rework</th><th class="n">Reject</th><th>Top issue</th></tr></thead><tbody id="labBody"></tbody></table>
+      </div>
+    </div>
+    <div class="card flat">
+      <div class="tablebox">
+        <table><thead><tr><th>Task</th><th>Labeller</th><th class="n">Mean</th><th>Recommendation</th><th>Weakest axis</th></tr></thead><tbody id="taskBody"></tbody></table>
+      </div>
+    </div>
+    <p class="hint" style="margin:0">Click a task to open its scorecard.</p>
+  </section>
+
+  <section id="rubricSec" hidden aria-labelledby="h-rubric">
+    <h2 id="h-rubric">3 · Rubric</h2>
+    <details id="rubricBox">
+      <summary id="rubricTitle">Rubric</summary>
+      <ul class="axislist" id="rubric"></ul>
+    </details>
+  </section>
+
+  <section id="cardSec" hidden aria-labelledby="h-card">
+    <h2 id="h-card">4 · Scorecard <span class="badge demo qa-demo">Demo data</span></h2>
+    <div class="card">
+      <div class="head">
+        <div>
+          <h3 id="tName"></h3>
+          <p class="summary" id="tSummary"></p>
+        </div>
+        <div class="mean"><span id="tDecision" class="badge"></span><span id="tMean"></span></div>
+      </div>
+      <div class="tablebox">
+        <table class="scores"><thead><tr><th>Axis</th><th>Score</th><th>Evidence, quoted from the output</th></tr></thead><tbody id="scores"></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section id="pbSec" hidden aria-labelledby="h-pb">
+    <h2 id="h-pb">5 · Reviewer playbook <span class="badge demo qa-demo">Demo data</span></h2>
+    <div class="card">
+      <div class="head">
+        <p class="summary" style="margin:0">For a new labeller joining this spec. Written from the rubric, with examples quoted from this batch.</p>
+        <div class="actions"><button id="copyPb">Copy playbook</button></div>
+      </div>
+      <div class="pb" id="pb"></div>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>How it scores.</b> Four axes are fixed: correctness, guideline adherence, completeness and format, each with 1/3/5 anchors. Hard rules come from the spec's own lines, and lines about tone or format feed the fixed axes instead. Correctness checks every amount, date and order status the agent states against the tool results, the customer and the spec. Every quote is copied from the output, never written. The recommendation is a fixed rule: two broken hard rules or a mean under 2.5 rejects; one broken rule, or any axis under 3, sends it back for rework.</p>
+    <p><b>What this version is.</b> A transparent rules engine that runs in your browser: no model, no server, nothing stored except the tracker in your own browser. Every spec, trajectory, labeller, client and batch is synthetic. A production version would swap the matching step for a model grader calibrated against human reviewers, and keep the same rubric, quoting and decision rule.</p>
+  </footer>
+  </div>
+
+  <div id="panelTracker" class="panel" role="tabpanel" aria-labelledby="tabTracker" hidden>
+    <div id="demoBar" class="demo-bar" hidden><span>Demo data. Every batch, client and labeller is synthetic.</span><button id="clearDemo">Clear demo batches</button></div>
+
+    <section aria-labelledby="h-note">
+      <h2 id="h-note">Weekly note · ready to send <span class="badge demo trk-demo">Demo data</span></h2>
+      <div class="card">
+        <pre class="note" id="note"></pre>
+        <div class="actions"><button id="copyNote">Copy note</button><span class="hint">Plain text, so it pastes into Slack or email as it is.</span></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-bott">
+      <h2 id="h-bott">Bottlenecks <span class="badge demo trk-demo">Demo data</span></h2>
+      <div class="two">
+        <div class="card">
+          <h2>Needs attention</h2>
+          <ul class="attn" id="attention"></ul>
+        </div>
+        <div class="card flat">
+          <div class="tablebox">
+            <table><thead><tr><th>Stage</th><th class="n">Batches</th><th class="n">SLA</th><th class="n">Over SLA</th></tr></thead><tbody id="stageBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-batches">
+      <h2 id="h-batches">Batches <span class="badge demo trk-demo">Demo data</span></h2>
+      <div class="card flat">
+        <div class="tablebox">
+          <table class="trk"><thead><tr><th>Batch</th><th>Stage</th><th class="n">Labelled</th><th class="n">Tasks/day</th><th class="n">Pass</th><th class="n">Rework</th><th class="n">Cost</th><th class="n">Per accepted</th><th>Deadline</th><th></th></tr></thead><tbody id="trkBody"></tbody></table>
+        </div>
+      </div>
+      <div class="actions"><button id="copyCsv">Copy as CSV</button><span class="hint">Cost is tasks × rate, with reworked tasks paid again. Per accepted divides the cost of reviewed tasks by the ones accepted.</span></div>
+    </section>
+
+    <section aria-labelledby="h-lab">
+      <h2 id="h-lab">Labellers <span class="badge demo trk-demo">Demo data</span></h2>
+      <div class="card flat">
+        <div class="tablebox">
+          <table><thead><tr><th>Labeller</th><th class="n">Tasks</th><th class="n">Tasks/day</th><th class="n">Pass</th><th class="n">Rework</th><th class="n">Cost</th><th>Top issue</th></tr></thead><tbody id="labTrkBody"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-add">
+      <h2 id="h-add">Add a batch</h2>
+      <form class="card addform" id="addForm">
+        <label for="addId">Batch<input id="addId" required autocomplete="off" placeholder="B-09"></label>
+        <label for="addName">Name<input id="addName" autocomplete="off" placeholder="Exchanges"></label>
+        <label for="addClient">Client<input id="addClient" required autocomplete="off" placeholder="Client D"></label>
+        <label for="addTasks">Tasks<input id="addTasks" type="number" min="1" required></label>
+        <label for="addRate">Rate per task ($)<input id="addRate" type="number" min="0" step="0.5" value="25" required></label>
+        <label for="addDue">Customer deadline<input id="addDue" type="date" required></label>
+        <button class="primary" type="submit">Add batch</button>
+      </form>
+      <p class="hint" style="margin:0">The tracker saves to this browser only. Nothing is sent anywhere, and anyone else opening the link sees their own copy.</p>
+    </section>
+  </div>
+</div>
+
+<script id="engine">
+// QA engine. Pure functions, no network. Exposed as window.QA (and module.exports for tests).
+(function (root) {
+  const STOP = new Set("a an and or the of to in for with on at by from as is are be you your we our us this that it its will can who what when where how why into about have has had their them they all any more most such than very well also just like please thanks thank hello hi order orders need want would could here there still really get got some been were was i'm it's can't don't my me i".split(" "));
+  const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const DATE_RE = /\b(?:(\d{4})-(\d{2})-(\d{2})|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?!\d)|(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)\b/gi;
+  const NUM_RE = /(\$\s?)?\b(\d[\d,]*(?:\.\d+)?)\b/g;
+  const STATUS_RE = /\b(in transit|out for delivery|shipped|delivered|processing|cancell?ed|refunded|returned|lost|pending|on hold)\b/gi;
+  const ACTION_TOOL = /cancel|refund|update|change|reset|delete|modify/;
+  const LOOKUP_TOOL = /look(?:ed)?[ _]?up|\bget_|fetch|track|search/i;
+  const ASK_PERMISSION = /go ahead|proceed|shall i|should i|do you want me|would you like me|is that (?:ok|okay|alright)|happy for me/i;
+  const YES = /\b(yes|yeah|yep|go ahead|please do|sure|ok(?:ay)?|do it|confirmed?)\b/i;
+  const BLAME = /\byou (?:should have|didn['’]t|forgot|failed to)\b|your fault|as I (?:already )?said/i;
+  const isBullet = (t) => /^\s*(?:[-•*▪●–]|\d+[.)])\s+/.test(t);
+  const stripBullet = (t) => t.replace(/^\s*(?:[-•*▪●–]|\d+[.)])\s+/, "").trim();
+  const words = (t) => (t.match(/[A-Za-z0-9$'’.-]+/g) || []).length;
+  const titleCase = (s) => s.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+  const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // ---------- Facts: amounts, dates and statuses, normalised so "$42.50" matches 42.50 and "Oct 21" matches 2026-10-21 ----------
+  function factsIn(text) {
+    const facts = [];
+    const rest = text.replace(DATE_RE, (raw, y, m, d, mon1, d1, d2, mon2) => {
+      const norm = y ? `${+m}-${+d}` : mon1 ? `${MONTHS.indexOf(mon1.toLowerCase()) + 1}-${+d1}` : `${MONTHS.indexOf(mon2.toLowerCase()) + 1}-${+d2}`;
+      facts.push({ raw, norm: "d:" + norm, kind: "date" });
+      return " ";
+    });
+    rest.replace(NUM_RE, (raw, cur, n) => {
+      const v = parseFloat(n.replace(/,/g, ""));
+      if (cur || v >= 10) facts.push({ raw: raw.trim(), norm: "n:" + v, kind: cur ? "money" : "number" });
+      return raw;
+    });
+    const statuses = [];
+    text.replace(STATUS_RE, (raw, s, at) => {
+      if (!/(?:n['’]t|\bnot|\bno longer|\bnever)\s+(?:\w+\s+)?$/i.test(text.slice(Math.max(0, at - 20), at))) statuses.push(s.toLowerCase().replace("canceled", "cancelled"));
+      return raw;
+    });
+    return { facts, statuses };
+  }
+
+  // ---------- Spec ----------
+  // Hard rules the engine knows how to check. spec = how a guideline line phrases it. Order matters: first match wins.
+  const RULES = [
+    { id: "refund_cap", name: "Escalate refunds over the cap", spec: /refunds? (?:over|above|of more than|greater than) \$\s?\d+/i, checklist: "Any refund over the cap goes to escalate, never issue_refund." },
+    { id: "verify", name: "Verify identity before changes", spec: /verif\w*|identity|authenticat\w*/i, checklist: "Identity is verified before any change to an order or account." },
+    { id: "confirm", name: "Confirm before acting", spec: /confirm\w*.*before|ask\w* .*before|explicit (?:yes|consent)/i, checklist: "The customer says yes before a cancel or refund goes through." },
+    { id: "lookup", name: "Look up before stating facts", spec: /look ?up|before stating|before (?:quoting|giving)/i, checklist: "Every status, date and amount comes after the lookup that returned it." },
+    { id: "escalate", name: "Escalate when asked for a person", spec: /escalat\w*|hand (?:off|over)|transfer\w* to a (?:human|person)/i, checklist: "A request for a person ends in escalate." },
+  ];
+  const FORMAT_CUE = /\bwords?\b|written as|format|end with|starting with|prefix|one line|markdown/i;
+  const STYLE_CUE = /\btone\b|blame|guess|polite|apolog|calm|plain|friendly|jargon/i;
+
+  function parseSpec(text) {
+    const raw = text.split(/\r?\n/).map((l) => l.replace(/\s+$/, "")).filter((l) => l.trim());
+    const title = raw[0] && raw[0].length < 90 ? stripBullet(raw[0]) : "this task";
+    let section = "";
+    const lines = [];
+    for (const l of raw.slice(1)) {
+      const t = l.trim();
+      if (!isBullet(t) && t.length < 60 && !/[.!:]$/.test(t)) { section = t; continue; }
+      lines.push({ text: stripBullet(t), section, bullet: isBullet(t) });
+    }
+    const mustHaves = [], skipped = [], params = { wordLimit: null, toolSyntax: false, summaryPrefix: null, banned: [] };
+    for (const b of lines.filter((x) => x.bullet)) {
+      const sec = b.section;
+      let kind;
+      if (/format/i.test(sec)) kind = "format";
+      else if (/style|tone|voice/i.test(sec)) kind = "style";
+      else {
+        const rule = RULES.find((r) => r.spec.test(b.text));
+        kind = rule ? rule : FORMAT_CUE.test(b.text) ? "format" : STYLE_CUE.test(b.text) ? "style" : /must|rule|require|policy|always|never/i.test(sec) ? "generic" : "context";
+      }
+      if (kind === "format") {
+        const w = b.text.match(/(?:under|fewer than|less than|at most|max(?:imum)?(?: of)?|no more than)\s+(\d+)\s+words/i);
+        if (w) params.wordLimit = Number(w[1]);
+        if (/\w+\(\w+=/.test(b.text)) params.toolSyntax = true;
+        const p = b.text.match(/(?:starting|starts|beginning|begins|prefixed)\s+(?:with\s+)?([A-Z][A-Z ]*:)/);
+        if (p) params.summaryPrefix = p[1];
+        skipped.push({ text: b.text, why: "feeds Format" });
+        continue;
+      }
+      if (kind === "style") {
+        for (const m of b.text.matchAll(/["“]([^"”]+)["”]/g)) params.banned.push(m[1].toLowerCase());
+        skipped.push({ text: b.text, why: "feeds Guideline adherence" });
+        continue;
+      }
+      if (kind === "context") { skipped.push({ text: b.text, why: "reference, not a check" }); continue; }
+      if (mustHaves.length === 4) { skipped.push({ text: b.text, why: "past the four-rule limit" }); continue; }
+      let axis;
+      if (kind === "generic") {
+        const keys = [...new Set((b.text.toLowerCase().match(/[a-z_][a-z_&/+-]{3,}/g) || []).filter((w) => !STOP.has(w)))].slice(0, 6);
+        axis = { id: "rule_" + mustHaves.length, name: titleCase(keys.slice(0, 3).join(" ").replace(/_/g, " ")) || "Rule", rule: "generic", keys, checklist: b.text };
+      } else {
+        if (mustHaves.some((m) => m.rule === kind.id)) continue;
+        axis = { id: kind.id, name: kind.name, rule: kind.id, checklist: kind.checklist };
+        if (kind.id === "refund_cap") axis.cap = Number(b.text.match(/\$\s?(\d+)/)[1]);
+      }
+      axis.spec_quote = b.text;
+      axis.anchors = { 1: "Breaks the rule.", 3: "Partly follows it.", 5: "Follows it, and the line that shows it is quoted." };
+      mustHaves.push(axis);
+    }
+    return { title, mustHaves, skipped, params };
+  }
+
+  const FIXED = [
+    { id: "correctness", name: "Correctness", question: "Does every fact the agent states come from a tool result, the customer or the spec?",
+      anchors: { 1: "States amounts, dates or statuses no tool returned.", 3: "One unsupported fact, or nothing stated that can be checked.", 5: "Every amount, date and status traces to a tool result." } },
+    { id: "adherence", name: "Guideline adherence", question: "Does it follow the spec's tone and style lines?",
+      anchors: { 1: "Several banned phrases, or blames the customer.", 3: "One slip against the style lines.", 5: "Calm and plain, with no banned phrase." } },
+    { id: "completeness", name: "Completeness", question: "Is every customer request handled and closed?",
+      anchors: { 1: "The customer's request goes unanswered.", 3: "Requests handled, but the conversation is left hanging.", 5: "Every request handled and the outcome stated." } },
+    { id: "format", name: "Format", question: "Does every line match the spec's format?",
+      anchors: { 1: "Three or more format breaks.", 3: "One format break.", 5: "Every line in the spec's format." } },
+  ];
+
+  // ---------- Output ----------
+  function parseArgs(s) {
+    const out = {};
+    for (const part of s.split(/,\s*(?=[a-z_]+=)/i)) { const m = part.match(/^\s*([a-z_]+)\s*=\s*(.*?)\s*$/i); if (m) out[m[1].toLowerCase()] = m[2]; }
+    return out;
+  }
+  function parseOutput(text) {
+    const lines = [];
+    for (const raw of String(text).split(/\r?\n/)) {
+      const t = raw.trim();
+      if (!t) continue;
+      const m = t.match(/^(USER|AGENT|TOOL|SUMMARY)\b\s*:?\s*(.*)$/i);
+      const line = { text: t, role: m ? m[1].toUpperCase() : "OTHER", body: m ? m[2] : t, i: lines.length };
+      if (line.role === "TOOL") {
+        const tm = /^TOOL\s+[a-z_]\w*\s*\(/i.test(t) && line.body.match(/^([a-z_]\w*)\s*\(([^)]*)\)\s*(?:->|→)\s*(.*)$/i);
+        if (tm) Object.assign(line, { tool: tm[1].toLowerCase(), args: parseArgs(tm[2]), result: tm[3], wellFormed: true });
+        else Object.assign(line, { tool: (line.body.match(/^[a-z_]+/i) || [""])[0].toLowerCase(), args: {}, result: line.body, wellFormed: false });
+      }
+      lines.push(line);
+    }
+    return lines;
+  }
+
+  function groundFor(lines, specText) {
+    const facts = new Set(), status = new Set();
+    for (const l of lines) {
+      if (l.role !== "USER" && l.role !== "TOOL") continue;
+      factsIn(l.body).facts.forEach((x) => facts.add(x.norm));
+      if (l.role === "TOOL") {
+        for (const m of l.body.matchAll(STATUS_RE)) status.add(m[1].toLowerCase().replace("canceled", "cancelled"));
+        if (/"cancell?ed":\s*true/i.test(l.body)) status.add("cancelled");
+        if (/"refunded"/i.test(l.body)) status.add("refunded");
+      }
+    }
+    factsIn(specText || "").facts.forEach((x) => facts.add(x.norm));
+    return { facts, status };
+  }
+
+  const agentLines = (lines) => lines.filter((l) => l.role === "AGENT" || l.role === "SUMMARY");
+  const result = (axis_id, score, evidence, reasoning, negative = false) => ({ axis_id, score, evidence: [...new Set(evidence.filter(Boolean))].slice(0, 2), reasoning, negative });
+
+  // ---------- Fixed axes ----------
+  function scoreCorrectness(lines, ground) {
+    const ok = [], bad = [];
+    for (const l of agentLines(lines)) {
+      const f = factsIn(l.body);
+      if (!f.facts.length && !f.statuses.length) continue;
+      const miss = [...f.facts.filter((x) => !ground.facts.has(x.norm)).map((x) => x.raw), ...f.statuses.filter((s) => !ground.status.has(s))];
+      (miss.length ? bad : ok).push({ l, miss });
+    }
+    const n = ok.length + bad.length;
+    if (bad.length) {
+      const what = [...new Set(bad.flatMap((b) => b.miss))].map((m) => `“${m}”`).join(", ");
+      return result("correctness", bad.length >= 2 ? 1 : 2, bad.map((b) => b.l), `${bad.length} of ${n} factual lines state something no tool returned: ${what}.`, true);
+    }
+    if (!n) return result("correctness", 3, [agentLines(lines)[0]], "No amount, date or status stated, so nothing to check.");
+    return result("correctness", n >= 2 ? 5 : 4, ok.map((o) => o.l), `${n} factual line${n === 1 ? "" : "s"} checked; every amount, date and status matches a tool result, the customer or the spec.`);
+  }
+
+  function scoreAdherence(lines, params) {
+    const bad = [];
+    for (const l of agentLines(lines)) {
+      const lt = l.body.toLowerCase();
+      const hits = params.banned.filter((p) => new RegExp(`\\b${reEsc(p)}\\b`).test(lt));
+      if (BLAME.test(l.body)) hits.push("blames the customer");
+      if (hits.length) bad.push({ l, hits });
+    }
+    const count = bad.reduce((s, b) => s + b.hits.length, 0);
+    if (!count) return result("adherence", 5, agentLines(lines).filter((l) => l.role === "AGENT").slice(0, 1), params.banned.length ? `None of the spec's banned phrases (${params.banned.map((p) => `“${p}”`).join(", ")}) and no blame.` : "No blame or banned phrasing.");
+    const score = count === 1 ? 3 : count === 2 ? 2 : 1;
+    return result("adherence", score, bad.map((b) => b.l), `${count} slip${count === 1 ? "" : "s"} against the style lines: ${[...new Set(bad.flatMap((b) => b.hits))].map((h) => (h === "blames the customer" ? h : `“${h}”`)).join(", ")}.`, true);
+  }
+
+  function keysOf(t) {
+    const ws = (t.toLowerCase().match(/[a-z][a-z'’]{3,}/g) || []).filter((w) => !STOP.has(w));
+    return ws.length ? ws : t.match(/\b\d{3,}\b/g) || [];
+  }
+  function scoreCompleteness(lines) {
+    const asks = [];
+    lines.forEach((l, idx) => {
+      if (l.role !== "USER") return;
+      for (const s of l.body.split(/(?<=[.!?])\s+/)) {
+        if (!/\?\s*$/.test(s) && !/^(?:also,?\s+)?(?:can|could|would|please|i need|i want|i'd like)\b/i.test(s.trim())) continue;
+        asks.push({ l, idx, s, keys: keysOf(s).length ? keysOf(s) : keysOf(l.body) });
+      }
+    });
+    if (!asks.length) return result("completeness", 3, [lines.find((l) => l.role === "USER")], "No clear request from the customer to check against.");
+    const later = (a) => lines.slice(a.idx + 1).filter((l) => l.role === "AGENT" || l.role === "TOOL");
+    const answered = asks.map((a) => ({ a, by: later(a).find((l) => a.keys.some((k) => l.body.toLowerCase().includes(k.slice(0, 5)))) }));
+    const missed = answered.filter((x) => !x.by);
+    if (missed.length) {
+      return result("completeness", missed.length === asks.length ? 1 : 2, missed.map((x) => x.a.l),
+        `${missed.length} of ${asks.length} request${asks.length === 1 ? "" : "s"} never answered: “${missed.map((x) => x.a.s).join("”, “")}”`, true);
+    }
+    const lastAgent = [...lines].reverse().find((l) => l.role === "AGENT");
+    const hanging = lastAgent && /\?\s*$/.test(lastAgent.body) && !lines.slice(lastAgent.i + 1).some((l) => l.role === "USER");
+    if (hanging) return result("completeness", 3, [lastAgent], "Every request is picked up, but it ends on a question to the customer with no answer, so nothing is resolved.", true);
+    return result("completeness", 5, answered.map((x) => x.by), `${asks.length} request${asks.length === 1 ? "" : "s"} found, every one handled, and the last reply states the outcome.`);
+  }
+
+  function scoreFormat(lines, params) {
+    const issues = [];
+    for (const l of lines) {
+      if (l.role === "OTHER") issues.push({ l, why: "line has no USER, AGENT, TOOL or SUMMARY prefix" });
+      if (l.role === "TOOL" && params.toolSyntax && !l.wellFormed) issues.push({ l, why: "tool call not written as TOOL name(arg=value) -> result" });
+      if (l.role === "AGENT" && params.wordLimit && words(l.body) >= params.wordLimit) issues.push({ l, why: `reply is ${words(l.body)} words, limit under ${params.wordLimit}` });
+    }
+    if (params.summaryPrefix) {
+      const last = lines[lines.length - 1];
+      const has = lines.some((l) => l.text.toUpperCase().startsWith(params.summaryPrefix));
+      if (!has) issues.push({ l: last, why: `no ${params.summaryPrefix} line; it ends on the line quoted` });
+      else if (last && !last.text.toUpperCase().startsWith(params.summaryPrefix)) issues.push({ l: last, why: `${params.summaryPrefix} is not the last line` });
+    }
+    if (!issues.length) {
+      const checks = ["every line prefixed", params.toolSyntax && "tool calls well formed", params.wordLimit && `replies under ${params.wordLimit} words`, params.summaryPrefix && `ends with ${params.summaryPrefix}`].filter(Boolean);
+      return result("format", 5, [lines.find((l) => l.role === "TOOL"), lines[lines.length - 1]], `Matches the spec: ${checks.join(", ")}.`);
+    }
+    const score = issues.length === 1 ? 3 : issues.length === 2 ? 2 : 1;
+    return result("format", score, issues.map((x) => x.l), `${issues.length} format break${issues.length === 1 ? "" : "s"}: ${issues.map((x) => x.why).join("; ")}.`, true);
+  }
+
+  // ---------- Hard rules. A null score means the task never triggered the rule ----------
+  const actions = (lines) => lines.filter((l) => l.role === "TOOL" && ACTION_TOOL.test(l.tool));
+  const firstFactual = (lines) => lines.find((l) => {
+    if (l.role !== "AGENT") return false;
+    const f = factsIn(l.body);
+    return f.facts.some((x) => x.kind !== "number") || f.statuses.length;
+  });
+
+  const CHECK = {
+    verify(axis, lines) {
+      const acts = actions(lines);
+      if (!acts.length) return result(axis.id, null, [], "Not triggered: no change to an order or account.");
+      const v = lines.find((l) => l.role === "TOOL" && /verif|authent/i.test(l.tool || l.body) && !/false|error/i.test(l.result));
+      if (v && v.i < acts[0].i) return result(axis.id, 5, [v], `Verified at line ${v.i + 1}, before the first change at line ${acts[0].i + 1}.`);
+      if (v) return result(axis.id, 2, [acts[0], v], "Verified, but only after the change went through.", true);
+      return result(axis.id, 1, [acts[0]], `Calls ${acts[0].tool} with no identity check anywhere in the trajectory.`, true);
+    },
+    lookup(axis, lines) {
+      const f = firstFactual(lines);
+      if (!f) return result(axis.id, null, [], "Not triggered: the agent states no status, date or amount.");
+      const lk = lines.find((l) => l.role === "TOOL" && LOOKUP_TOOL.test(l.tool + " " + l.body));
+      if (lk && lk.i < f.i) return result(axis.id, 5, [lk], `Looked up at line ${lk.i + 1}, before the first fact at line ${f.i + 1}.`);
+      return result(axis.id, 1, [f], lk ? `States order facts at line ${f.i + 1}, before the lookup at line ${lk.i + 1}.` : "States order facts with no lookup at all.", true);
+    },
+    confirm(axis, lines) {
+      const acts = actions(lines);
+      if (!acts.length) return result(axis.id, null, [], "Not triggered: no cancel, refund or change.");
+      let worst = 5, ev = [], why = "", from = 0;
+      for (const a of acts) {
+        const q = [...lines.slice(from, a.i)].reverse().find((l) => l.role === "AGENT" && /\?/.test(l.body) && (ASK_PERMISSION.test(l.body) || new RegExp(a.tool.split("_")[0], "i").test(l.body)));
+        const yes = q && lines.slice(q.i + 1, a.i).find((l) => l.role === "USER" && YES.test(l.body));
+        if (q && yes) { if (worst === 5) { ev = [q, yes]; why = `Asked at line ${q.i + 1} and got a yes before ${a.tool}.`; } }
+        else if (q) { if (worst > 3) { worst = 3; ev = [q]; why = `Asked before ${a.tool}, but the customer never said yes.`; } }
+        else { worst = 1; ev = [a]; why = `Calls ${a.tool} without asking the customer first.`; }
+        from = a.i + 1;
+      }
+      return result(axis.id, worst, ev, why, worst < 5);
+    },
+    refund_cap(axis, lines) {
+      const refunds = lines.filter((l) => l.role === "TOOL" && /refund/.test(l.tool) && l.args && l.args.amount);
+      const over = refunds.find((l) => parseFloat(l.args.amount) > axis.cap);
+      if (over) return result(axis.id, 1, [over], `Refunds $${parseFloat(over.args.amount).toFixed(2)} through ${over.tool}; anything over $${axis.cap} must go to escalate.`, true);
+      const esc = lines.find((l) => l.role === "TOOL" && /escalat/.test(l.tool));
+      const totals = lines.filter((l) => l.role === "TOOL").flatMap((l) => [...l.body.matchAll(/"(?:total|amount)":\s*(\d+(?:\.\d+)?)/g)].map((m) => parseFloat(m[1])));
+      if (esc && totals.some((t) => t > axis.cap)) return result(axis.id, 5, [esc], `The amount is over $${axis.cap}, and it went to escalate instead of a refund.`);
+      if (refunds.length) return result(axis.id, 5, [refunds[0]], `Refund of $${parseFloat(refunds[0].args.amount).toFixed(2)} is within the $${axis.cap} cap.`);
+      return result(axis.id, null, [], "Not triggered: no refund in this task.");
+    },
+    escalate(axis, lines) {
+      const ask = lines.find((l) => l.role === "USER" && /\b(?:human|person|manager|supervisor|real agent)\b/i.test(l.body));
+      if (!ask) return result(axis.id, null, [], "Not triggered: the customer never asks for a person.");
+      const esc = lines.find((l) => l.role === "TOOL" && /escalat/.test(l.tool) && l.i > ask.i);
+      return esc ? result(axis.id, 5, [esc], "Asked for a person and was escalated.") : result(axis.id, 1, [ask], "Asked for a person and was never escalated.", true);
+    },
+    generic(axis, lines) {
+      const hits = lines.filter((l) => l.role !== "USER").map((l) => ({ l, n: axis.keys.filter((k) => l.body.toLowerCase().includes(k.slice(0, 5))).length })).sort((a, b) => b.n - a.n);
+      const top = hits[0];
+      if (top && top.n >= 2) return result(axis.id, 5, [top.l], "A line in the output carries this rule's key terms.");
+      if (top && top.n === 1) return result(axis.id, 3, [top.l], "Only partly shown: one of the rule's key terms appears.");
+      return result(axis.id, 1, [lines[0]], "No line in the output shows this rule.", true);
+    },
+  };
+
+  // ---------- Recommendation ----------
+  function recommend(scores, mustIds) {
+    const vals = scores.filter((s) => s.score != null).map((s) => s.score);
+    const mean = vals.reduce((a, b) => a + b, 0) / (vals.length || 1);
+    const broken = scores.filter((s) => mustIds.includes(s.axis_id) && s.score != null && s.score <= 2);
+    let decision = "accept";
+    if (mean < 2.5 || broken.length >= 2) decision = "reject";
+    else if (broken.length === 1 || vals.some((v) => v < 3) || mean < 3.75) decision = "rework";
+    return { decision, mean: Math.round(mean * 100) / 100, broken: broken.map((s) => s.axis_id) };
+  }
+
+  function buildRubric(specText) {
+    const s = parseSpec(specText);
+    return {
+      title: s.title, skipped: s.skipped, params: s.params, specText,
+      axes: [...FIXED.map((a) => ({ ...a, kind: "fixed" })), ...s.mustHaves.map((m) => ({ ...m, kind: "must_have" }))],
+    };
+  }
+
+  function qaTask(rubric, output) {
+    const lines = parseOutput(output);
+    if (!lines.length) throw new Error("A task has an empty output.");
+    const ground = groundFor(lines, rubric.specText);
+    const scores = rubric.axes.map((a) =>
+      a.id === "correctness" ? scoreCorrectness(lines, ground) :
+      a.id === "adherence" ? scoreAdherence(lines, rubric.params) :
+      a.id === "completeness" ? scoreCompleteness(lines) :
+      a.id === "format" ? scoreFormat(lines, rubric.params) : CHECK[a.rule](a, lines));
+    const mustIds = rubric.axes.filter((a) => a.kind === "must_have").map((a) => a.id);
+    const rec = recommend(scores, mustIds);
+    const name = (id) => rubric.axes.find((a) => a.id === id).name;
+    const weakest = scores.filter((s) => s.score != null).sort((a, b) => a.score - b.score || mustIds.includes(b.axis_id) - mustIds.includes(a.axis_id))[0];
+    const why = rec.decision === "reject" ? (rec.broken.length >= 2 ? `Breaks ${rec.broken.length} hard rules: ${rec.broken.map(name).join(" and ")}.` : "Mean below 2.5.")
+      : rec.decision === "rework" ? (rec.broken.length ? `Breaks one hard rule: ${name(rec.broken[0])}.` : `${name(weakest.axis_id)} is below 3.`)
+      : "Every axis at 3 or above and every hard rule kept.";
+    const untouched = scores.filter((s) => s.score == null).length;
+    return {
+      lines, scores, recommendation: rec, weakest_axis_id: weakest.axis_id,
+      summary: `${why}${rec.decision === "accept" ? "" : ` Weakest on ${name(weakest.axis_id)} (${weakest.score}/5).`}${untouched ? ` ${untouched} hard rule${untouched === 1 ? " was" : "s were"} not triggered by this task.` : ""}`,
+    };
+  }
+
+  // ---------- CSV ----------
+  function parseCSV(text) {
+    const rows = [];
+    let row = [], cell = "", q = false;
+    const s = String(text).replace(/^﻿/, "");
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (q) { if (c === '"') { if (s[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; continue; }
+      if (c === '"') q = true;
+      else if (c === ",") { row.push(cell); cell = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && s[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+      else cell += c;
+    }
+    if (cell || row.length) { row.push(cell); rows.push(row); }
+    const clean = rows.filter((r) => r.some((x) => x.trim()));
+    if (clean.length < 2) return [];
+    const ALIAS = { task_id: /^(?:task_?id|task|id)$/, batch: /^(?:batch|batch_?id)$/, labeller: /^(?:label+er|annotator|writer|rater)$/, labelled_on: /^(?:label+ed_?on|date|label+ed_?at|submitted_?(?:on|at))$/, output: /^(?:output|trajectory|text|response|transcript)$/ };
+    const head = clean[0].map((h) => h.trim().toLowerCase().replace(/[\s-]+/g, "_"));
+    const col = Object.fromEntries(Object.entries(ALIAS).map(([k, re]) => [k, head.findIndex((h) => re.test(h))]));
+    if (col.output < 0) throw new Error("No output column found. Name the trajectory column output, trajectory or text.");
+    const get = (r, k) => (col[k] >= 0 && r[col[k]] ? r[col[k]].trim() : "");
+    return clean.slice(1).map((r, i) => ({
+      task_id: get(r, "task_id") || `Task ${i + 1}`, batch: get(r, "batch") || "Unnamed batch", labeller: get(r, "labeller") || "Unknown labeller",
+      labelled_on: get(r, "labelled_on"), output: r[col.output] || "",
+    }));
+  }
+  const toCSV = (rows) => rows.map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+
+  // ---------- Batch ----------
+  function topIssue(results, rubric) {
+    const n = {};
+    for (const r of results) for (const s of r.scores) if (s.score != null && s.score <= 2) n[s.axis_id] = (n[s.axis_id] || 0) + 1;
+    const top = Object.entries(n).sort((a, b) => b[1] - a[1])[0];
+    return top ? { axis_id: top[0], name: rubric.axes.find((a) => a.id === top[0]).name, count: top[1] } : null;
+  }
+  function qaBatch(rubric, rows) {
+    const tasks = rows.map((r) => ({ ...r, result: qaTask(rubric, r.output) }));
+    const count = (list, d) => list.filter((t) => t.result.recommendation.decision === d).length;
+    const labellers = [...new Set(tasks.map((t) => t.labeller))].sort().map((name) => {
+      const mine = tasks.filter((t) => t.labeller === name);
+      return { name, tasks: mine.length, accepted: count(mine, "accept"), rework: count(mine, "rework"), rejected: count(mine, "reject"), passRate: count(mine, "accept") / mine.length, topIssue: topIssue(mine.map((t) => t.result), rubric) };
+    });
+    const batches = [...new Set(tasks.map((t) => t.batch))];
+    return {
+      batch: batches.length === 1 ? batches[0] : batches.join(", "), tasks, labellers,
+      accepted: count(tasks, "accept"), rework: count(tasks, "rework"), rejected: count(tasks, "reject"),
+      passRate: tasks.length ? count(tasks, "accept") / tasks.length : 0, topIssue: topIssue(tasks.map((t) => t.result), rubric),
+    };
+  }
+
+  // ---------- Reviewer playbook ----------
+  function playbook(rubric, batch) {
+    const quote = (id, test) => {
+      for (const t of batch.tasks) {
+        const s = t.result.scores.find((x) => x.axis_id === id);
+        if (s && s.score != null && test(s.score) && s.evidence[0]) return { task: t.task_id, text: s.evidence[0].text };
+      }
+      return null;
+    };
+    const must = rubric.axes.filter((a) => a.kind === "must_have");
+    const p = rubric.params;
+    const errors = rubric.axes.map((a) => ({ a, n: batch.tasks.filter((t) => { const s = t.result.scores.find((x) => x.axis_id === a.id); return s && s.score != null && s.score <= 2; }).length }))
+      .filter((x) => x.n).sort((a, b) => b.n - a.n);
+    const sections = [
+      { title: "What you're scored on", items: rubric.axes.filter((a) => a.kind === "fixed").map((a) => ({ text: `${a.name}: ${a.question}`, sub: `5 looks like: ${a.anchors[5]} 1 looks like: ${a.anchors[1]}` })) },
+      { title: "Hard rules from the spec", items: must.map((a) => ({ text: a.name, spec: a.spec_quote, pass: quote(a.id, (s) => s === 5), fail: quote(a.id, (s) => s <= 2) })) },
+      { title: "Where this batch went wrong", items: errors.length ? errors.map((x) => ({ text: `${x.a.name}: ${x.n} of ${batch.tasks.length} tasks scored 2 or below.`, fail: quote(x.a.id, (s) => s <= 2) })) : [{ text: "Nothing scored 2 or below in this batch." }] },
+      { title: "Before you submit a task", items: [
+        ...must.map((a) => ({ text: a.checklist })),
+        { text: "Every amount, date and status the agent states appears in a tool result, the customer's message or the spec." },
+        { text: "Every customer request gets an answer, and the last reply says what happened." },
+        p.wordLimit && { text: `Each agent reply is under ${p.wordLimit} words.` },
+        p.toolSyntax && { text: "Tool calls are written as TOOL name(arg=value) -> result." },
+        p.summaryPrefix && { text: `The last line starts ${p.summaryPrefix}` },
+        p.banned.length && { text: `None of these phrases: ${p.banned.map((b) => `“${b}”`).join(", ")}.` },
+      ].filter(Boolean) },
+      { title: "Your first week", items: [
+        { text: "Day 1: read the spec and this playbook, then label five practice tasks. They aren't scored." },
+        { text: "Day 2: review ten accepted tasks from this batch and note how each one handles the hard rules." },
+        { text: "Day 3: label fifteen tasks. Every one goes through QA, and you get the scorecards back the same day." },
+        { text: "Day 4: calibration. Score five tasks yourself, compare with QA, and talk through any axis where you're two or more points apart." },
+        { text: "Day 5: move to full rate if your pass rate is 80% or higher. Otherwise pair with a reviewer on your top issue first." },
+      ] },
+    ];
+    const out = [`Reviewer playbook: ${rubric.title}`, ""];
+    for (const s of sections) {
+      out.push(s.title.toUpperCase());
+      s.items.forEach((it, i) => {
+        out.push(`${i + 1}. ${it.text}`);
+        if (it.sub) out.push(`   ${it.sub}`);
+        if (it.spec) out.push(`   Spec: "${it.spec}"`);
+        if (it.pass) out.push(`   Passes (${it.pass.task}): ${it.pass.text}`);
+        if (it.fail) out.push(`   Fails (${it.fail.task}): ${it.fail.text}`);
+      });
+      out.push("");
+    }
+    return { sections, text: out.join("\n").trim() };
+  }
+
+  const api = { buildRubric, parseSpec, parseOutput, parseCSV, toCSV, qaTask, qaBatch, recommend, playbook, factsIn, FIXED };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.QA = api;
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+
+<script id="tracker-core">
+// Batch tracker. Pure functions over a list of batch records.
+(function (root) {
+  const STAGES = ["Queued", "Labelling", "QA", "Rework", "Delivered"];
+  const SLA = { Queued: 1, Labelling: 4, QA: 1, Rework: 2 };
+  const DAY = 86400000;
+  const days = (a, b) => (b - a) / DAY;
+  const daysIn = (b, now) => Math.max(0, Math.floor(days(Date.parse(b.moved), now)));
+  const active = (b) => b.stage !== "Delivered";
+  const fmtDay = (t) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+  function metrics(b, now, pace = 8) {
+    const start = Date.parse(b.started || b.moved);
+    const end = b.delivered ? Date.parse(b.delivered) : now;
+    const elapsed = Math.max(1, days(start, end));
+    const throughput = b.labelled ? b.labelled / elapsed : 0;
+    const deadline = Date.parse(b.deadline);
+    const m = {
+      throughput, elapsed, deadline, daysLeft: days(now, deadline), remaining: Math.max(0, b.tasks - b.labelled),
+      passRate: b.reviewed ? b.accepted / b.reviewed : null, reworkRate: b.reviewed ? b.rework / b.reviewed : null,
+      cost: (b.labelled + b.rework) * b.rate, perAccepted: b.accepted ? ((b.reviewed + b.rework) * b.rate) / b.accepted : null,
+    };
+    if (!active(b)) {
+      m.slack = days(end, deadline);
+      m.status = m.slack >= -0.5 ? "on_time" : "late";
+      return m;
+    }
+    // Labelling and QA overlap, so the tail is one final QA pass after the last task, or what's left of the current stage.
+    m.pace = throughput || pace;
+    const tail = b.stage === "QA" ? Math.max(0, SLA.QA - daysIn(b, now)) : b.stage === "Rework" ? Math.max(0, SLA.Rework - daysIn(b, now)) : SLA.QA;
+    m.projected = now + (m.remaining / m.pace + tail) * DAY;
+    m.slack = days(m.projected, deadline);
+    m.needed = m.remaining ? m.remaining / Math.max(0.5, m.daysLeft - SLA.QA) : 0;
+    m.status = deadline < now ? "late" : m.slack < 0 ? "at_risk" : "on_track";
+    return m;
+  }
+
+  // Average pace of delivered batches, used for a batch that hasn't started labelling.
+  function defaultPace(items, now) {
+    const d = items.filter((b) => !active(b)).map((b) => metrics(b, now).throughput);
+    return d.length ? d.reduce((a, b) => a + b, 0) / d.length : 8;
+  }
+
+  function overdue(items, now) {
+    return items.filter(active).filter((b) => daysIn(b, now) > SLA[b.stage])
+      .map((b) => ({ b, days: daysIn(b, now), over: daysIn(b, now) - SLA[b.stage] })).sort((a, z) => z.over - a.over);
+  }
+
+  function stages(items, now) {
+    const od = overdue(items, now);
+    return STAGES.map((stage) => ({ stage, n: items.filter((b) => b.stage === stage).length, sla: SLA[stage] ?? null, over: od.filter((o) => o.b.stage === stage).length }));
+  }
+
+  function labellers(items, now) {
+    const map = new Map();
+    for (const b of items) {
+      for (const l of b.labellers || []) {
+        const r = map.get(l.name) || { name: l.name, tasks: 0, reviewed: 0, accepted: 0, rework: 0, rejected: 0, cost: 0, spans: [], issues: {} };
+        r.tasks += l.tasks; r.reviewed += l.reviewed || 0; r.accepted += l.accepted || 0; r.rework += l.rework || 0; r.rejected += l.rejected || 0;
+        r.cost += (l.tasks + (l.rework || 0)) * b.rate;
+        r.spans.push([Date.parse(b.started || b.moved), b.delivered ? Date.parse(b.delivered) : now]);
+        if (l.topIssue) r.issues[l.topIssue] = (r.issues[l.topIssue] || 0) + (l.rework || 0) + (l.rejected || 0);
+        map.set(l.name, r);
+      }
+    }
+    // Labellers work batches in parallel, so pace is tasks over the union of their batches' spans.
+    const covered = (spans) => {
+      let total = 0, end = -Infinity;
+      for (const [s, e] of [...spans].sort((a, b) => a[0] - b[0])) { const from = Math.max(s, end); if (e > from) total += e - from; end = Math.max(end, e); }
+      return Math.max(1, total / DAY);
+    };
+    return [...map.values()].map(({ spans, ...r }) => ({
+      ...r, days: covered(spans), perDay: r.tasks / covered(spans), passRate: r.reviewed ? r.accepted / r.reviewed : null, reworkRate: r.reviewed ? r.rework / r.reviewed : null,
+      topIssue: (Object.entries(r.issues).sort((a, b) => b[1] - a[1])[0] || [null])[0],
+    })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // "This week" is everything active, plus batches delivered in the last seven days.
+  const inWeek = (items, now) => items.filter((b) => active(b) || Date.parse(b.delivered) >= now - 7 * DAY);
+
+  function week(items, now) {
+    const w = inWeek(items, now);
+    const sum = (k) => w.reduce((s, b) => s + (b[k] || 0), 0);
+    const reviewed = sum("reviewed"), accepted = sum("accepted"), rework = sum("rework");
+    const pace = defaultPace(items, now);
+    const atRisk = w.filter(active).map((b) => ({ b, m: metrics(b, now, pace) })).filter((x) => x.m.status !== "on_track").sort((a, z) => a.m.slack - z.m.slack);
+    return {
+      batches: w, reviewed, accepted, rework, labelled: sum("labelled"), atRisk, pace,
+      passRate: reviewed ? accepted / reviewed : null, reworkRate: reviewed ? rework / reviewed : null,
+      cost: w.reduce((s, b) => s + (b.labelled + b.rework) * b.rate, 0),
+      perAccepted: accepted ? w.reduce((s, b) => s + (b.reviewed + b.rework) * b.rate, 0) / accepted : null,
+      reworkCost: w.reduce((s, b) => s + b.rework * b.rate, 0),
+    };
+  }
+
+  function actionFor(b, m, over, now) {
+    if (m.status !== "on_track" && (b.stage === "Labelling" || b.stage === "Queued") && m.remaining) {
+      const crew = (b.labellers || []).length;
+      if (!crew) return `Assign labellers today: it needs ${m.needed.toFixed(1)} tasks a day to land.`;
+      const add = Math.max(1, Math.ceil((m.needed - m.pace) / (m.pace / crew)));
+      return `It needs ${m.needed.toFixed(1)} tasks a day to land and is doing ${m.pace.toFixed(1)}. Move ${plural(add, "labeller")} across from a batch with slack, or agree a split delivery with the client by ${fmtDay(now + DAY)}.`;
+    }
+    if (b.stage === "QA") return `Clear the QA queue today: ${b.reviewed} of ${b.labelled} tasks reviewed.`;
+    if (b.stage === "Rework") return `Send the scorecards back with the rework so it returns by ${fmtDay(now + DAY)}.`;
+    if (b.stage === "Queued") return "Assign labellers today.";
+    return over ? "Check pace with the labellers today." : "Watch it at tomorrow's stand-up.";
+  }
+
+  function bottlenecks(items, now) {
+    const pace = defaultPace(items, now), od = overdue(items, now);
+    const out = [];
+    for (const b of items.filter(active)) {
+      const m = metrics(b, now, pace);
+      const o = od.find((x) => x.b.id === b.id);
+      if (m.status === "on_track" && !o) continue;
+      out.push({ b, m, over: o ? o.over : 0, days: daysIn(b, now), severity: (m.status !== "on_track" ? 10 - m.slack : 0) + (o ? o.over : 0), action: actionFor(b, m, o, now) });
+    }
+    return out.sort((a, z) => z.severity - a.severity);
+  }
+
+  function describe(x) {
+    const { b, m } = x;
+    const left = Math.round(m.daysLeft);
+    const due = m.daysLeft >= 0 ? `due ${fmtDay(m.deadline)}, in ${plural(left, "day")}` : `${plural(Math.ceil(-m.daysLeft), "day")} past its ${fmtDay(m.deadline)} deadline`;
+    const parts = [m.remaining && (b.stage === "Labelling" || b.stage === "Queued") ? `${m.remaining} tasks left at ${m.pace.toFixed(1)} a day, ${due}` : `in ${b.stage}, ${due}`];
+    if (m.status === "at_risk") parts.push(`projects ${plural(Math.max(1, Math.ceil(-m.slack)), "day")} late`);
+    if (x.over) parts.push(`${x.days} days in ${b.stage} against a ${SLA[b.stage]}-day SLA`);
+    return parts.join("; ") + ".";
+  }
+
+  const money = (v) => "$" + Math.round(v).toLocaleString("en-US");
+  const money2 = (v) => "$" + v.toFixed(2);
+  const pct = (v) => (v == null ? "n/a" : Math.round(v * 100) + "%");
+  const label = (b) => `${b.id}${b.name ? " " + b.name : ""}`;
+
+  function note(items, now, demo = true) {
+    const w = week(items, now);
+    const mon = new Date(now); mon.setUTCDate(mon.getUTCDate() - ((mon.getUTCDay() + 6) % 7));
+    const L = [`QA update, week of ${fmtDay(mon)}${demo ? " (demo data)" : ""}`, ""];
+    const labs = labellers(w.batches, now);
+    const fast = [...labs].sort((a, b) => b.perDay - a.perDay);
+    L.push(`Throughput: ${w.labelled} tasks labelled across ${plural(w.batches.length, "batch").replace("batchs", "batches")}.${fast.length > 1 ? ` Fastest is ${fast[0].name} at ${fast[0].perDay.toFixed(1)} a day, slowest ${fast[fast.length - 1].name} at ${fast[fast.length - 1].perDay.toFixed(1)}.` : ""}`);
+    const worst = labs.filter((l) => l.passRate != null).sort((a, b) => a.passRate - b.passRate)[0];
+    L.push(`Quality: ${pct(w.passRate)} pass rate on ${w.reviewed} reviewed tasks; ${pct(w.reworkRate)} went back for rework.${worst ? ` Lowest is ${worst.name} at ${pct(worst.passRate)}${worst.topIssue ? `, mostly on ${worst.topIssue.toLowerCase()}` : ""}.` : ""}`);
+    L.push(`Cost: ${money(w.cost)} spent, ${w.perAccepted ? money2(w.perAccepted) : "n/a"} per accepted task. Rework accounts for ${money(w.reworkCost)} of it.`);
+    const done = w.batches.filter((b) => !active(b)).map((b) => ({ b, m: metrics(b, now) }));
+    const late = done.filter((x) => x.m.status === "late");
+    const doneText = done.length ? `${done.length - late.length} of ${done.length} delivered ${done.length === 1 ? "batch" : "batches"} landed on time${late.length ? ` (${late.map((x) => `${x.b.id} was ${plural(Math.ceil(-x.m.slack), "day")} late`).join(", ")})` : ""}. ` : "Nothing delivered yet this week. ";
+    L.push(`Timeliness: ${doneText}${w.atRisk.length ? `${w.atRisk.length} active ${w.atRisk.length === 1 ? "batch is" : "batches are"} at risk of missing the deadline.` : "Every active batch is on track."}`);
+    const bn = bottlenecks(items, now);
+    if (bn.length) {
+      L.push("", "Worst bottleneck", `${label(bn[0].b)} (${bn[0].b.client}): ${describe(bn[0])} ${bn[0].action}`);
+      if (bn.length > 1) {
+        L.push("", "Other flags");
+        bn.slice(1, 4).forEach((y, i) => L.push(`${i + 1}. ${label(y.b)}: ${describe(y)} ${y.action}`));
+      }
+    }
+    return L.join("\n");
+  }
+
+  function move(b, stage, now) {
+    if (stage === b.stage) return b;
+    const next = { ...b, stage, moved: new Date(now).toISOString() };
+    if (stage === "Delivered") next.delivered = next.moved; else delete next.delivered;
+    if (stage !== "Queued" && !b.started) next.started = next.moved;
+    return next;
+  }
+
+  function csv(items, now) {
+    const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const pace = defaultPace(items, now);
+    const rows = [["Batch", "Name", "Client", "Stage", "Days in stage", "Tasks", "Labelled", "Tasks per day", "Reviewed", "Pass rate", "Rework rate", "Cost", "Cost per accepted", "Deadline", "Timeliness"]];
+    for (const b of items) {
+      const m = metrics(b, now, pace);
+      rows.push([b.id, b.name, b.client, b.stage, daysIn(b, now), b.tasks, b.labelled, m.throughput.toFixed(1), b.reviewed, pct(m.passRate), pct(m.reworkRate), Math.round(m.cost), m.perAccepted ? m.perAccepted.toFixed(2) : "", b.deadline.slice(0, 10), m.status.replace("_", " ")]);
+    }
+    return rows.map((r) => r.map(q).join(",")).join("\n");
+  }
+
+  // Synthetic demo batches, dated relative to "now" so the deadline and SLA flags are live.
+  // Labeller rows: name, tasks, reviewed, accepted, rework, rejected, top issue.
+  function demo(now) {
+    const at = (d) => new Date(now + d * DAY).toISOString();
+    const lab = (rows) => rows.map(([name, tasks, reviewed, accepted, rework, rejected, topIssue]) => ({ name, tasks, reviewed, accepted, rework, rejected, topIssue }));
+    const B = [
+      { id: "B-04", name: "Refund flows", client: "Client A", stage: "Delivered", started: at(-14), moved: at(-5), delivered: at(-5), deadline: at(-4), tasks: 80, labelled: 80, reviewed: 80, accepted: 66, rework: 12, rejected: 2, rate: 24,
+        labellers: lab([["Labeller A", 18, 18, 17, 1, 0, "Format"], ["Labeller B", 26, 26, 20, 5, 1, "Correctness"], ["Labeller C", 20, 20, 16, 3, 1, "Verify identity before changes"], ["Labeller D", 16, 16, 13, 3, 0, "Format"]]) },
+      { id: "B-05", name: "Account changes", client: "Client B", stage: "Delivered", started: at(-11), moved: at(-2), delivered: at(-2), deadline: at(-3), tasks: 60, labelled: 60, reviewed: 60, accepted: 45, rework: 13, rejected: 2, rate: 26,
+        labellers: lab([["Labeller A", 14, 14, 13, 1, 0, null], ["Labeller B", 18, 18, 12, 5, 1, "Correctness"], ["Labeller C", 16, 16, 11, 4, 1, "Verify identity before changes"], ["Labeller D", 12, 12, 9, 3, 0, "Completeness"]]) },
+      { id: "B-03", name: "Billing disputes", client: "Client C", stage: "Rework", started: at(-10), moved: at(-1), deadline: at(4), tasks: 45, labelled: 45, reviewed: 45, accepted: 34, rework: 9, rejected: 2, rate: 25,
+        labellers: lab([["Labeller A", 10, 10, 9, 1, 0, null], ["Labeller B", 14, 14, 10, 3, 1, "Correctness"], ["Labeller C", 12, 12, 8, 3, 1, "Escalate refunds over the cap"], ["Labeller D", 9, 9, 7, 2, 0, "Format"]]) },
+      { id: "B-06", name: "Shipping questions", client: "Client A", stage: "QA", started: at(-9), moved: at(-3), deadline: at(3), tasks: 50, labelled: 50, reviewed: 20, accepted: 16, rework: 3, rejected: 1, rate: 24,
+        labellers: lab([["Labeller A", 12, 5, 5, 0, 0, null], ["Labeller B", 16, 6, 4, 2, 0, "Correctness"], ["Labeller C", 12, 5, 4, 0, 1, "Verify identity before changes"], ["Labeller D", 10, 4, 3, 1, 0, "Format"]]) },
+      // B-07's QA counts match the demo sample on the QA tab, so sending that sample to the tracker changes nothing.
+      { id: "B-07", name: "Order support", client: "Client C", stage: "Labelling", started: at(-5), moved: at(-5), deadline: at(4), tasks: 60, labelled: 34, reviewed: 10, accepted: 4, rework: 4, rejected: 2, rate: 28,
+        labellers: lab([["Labeller A", 8, 3, 3, 0, 0, null], ["Labeller B", 12, 3, 1, 1, 1, "Correctness"], ["Labeller C", 8, 2, 0, 1, 1, "Verify identity before changes"], ["Labeller D", 6, 2, 0, 2, 0, "Format"]]) },
+      { id: "B-08", name: "Returns", client: "Client B", stage: "Queued", moved: at(-0.5), deadline: at(12), tasks: 40, labelled: 0, reviewed: 0, accepted: 0, rework: 0, rejected: 0, rate: 25, labellers: [] },
+    ];
+    return B.map((b) => ({ ...b, demo: true }));
+  }
+
+  const api = { STAGES, SLA, daysIn, metrics, overdue, stages, labellers, week, bottlenecks, note, move, csv, demo, active, defaultPace, pct, money, money2, fmtDay };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.Tracker = api;
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+
+<script id="demo">
+// Demo inputs: a synthetic spec for customer-support agent trajectories, and a QA sample of ten tasks
+// from batch B-07. Four synthetic labellers, each with a different error profile:
+// A is clean, B states facts the tools never returned, C skips identity checks and the refund cap,
+// D breaks the format and misses requests. The retailer, customers and emails are all made up.
+window.DEMO = (function () {
+  const spec = `Support agent trajectories: order and account help
+
+Task
+Write the full trajectory a support agent should follow for the customer message given: every tool call and every reply. These become training demonstrations for a tool-using agent, so they must be right, not just plausible.
+
+Hard rules
+- Verify the customer's identity with verify_customer before any change to an order or account.
+- Look up the order with lookup_order before stating its status, dates or amounts.
+- Confirm with the customer before calling cancel_order or issue_refund.
+- Refunds over $100 go to a person: call escalate instead of issue_refund.
+
+Style
+- Keep a calm, plain tone. Do not blame the customer.
+- Do not guess about order facts: no "probably", "should be" or "I think".
+
+Format
+- Each agent reply is under 60 words.
+- Tool calls are written as TOOL name(arg=value) -> result.
+- End with a line starting SUMMARY: that states the outcome in one sentence.
+
+Reference
+- Refunds reach the original payment method in 3-5 business days.`;
+
+  const T = (id, labeller, date, lines) => ({ task_id: id, batch: "B-07", labeller, labelled_on: date, output: lines.join("\n") });
+  const tasks = [
+    T("T-0701", "Labeller A", "2026-10-14", [
+      "USER: Hi, where is my order 4417? It was meant to arrive yesterday.",
+      'TOOL lookup_order(order_id=4417) -> {"status": "in transit", "eta": "2026-10-21", "carrier_note": "weather delay"}',
+      "AGENT: Order 4417 is in transit. The carrier logged a weather delay, and the new delivery date is Oct 21.",
+      "USER: Okay, thanks.",
+      "AGENT: You're welcome. The tracking link in your confirmation email will update as it moves.",
+      "SUMMARY: Gave the customer the delayed delivery date for order 4417 from the tracking lookup.",
+    ]),
+    T("T-0702", "Labeller A", "2026-10-15", [
+      "USER: I need to cancel order 5512. It hasn't shipped yet.",
+      "AGENT: I can help with that. What's the email address on the account?",
+      "USER: j.doe@example.com",
+      'TOOL verify_customer(email=j.doe@example.com) -> {"verified": true}',
+      'TOOL lookup_order(order_id=5512) -> {"status": "processing", "total": 42.50}',
+      "AGENT: Thanks. Order 5512 is still processing, so it can be cancelled with a full refund of $42.50. Shall I go ahead?",
+      "USER: Yes please.",
+      'TOOL cancel_order(order_id=5512) -> {"cancelled": true, "refund": 42.50}',
+      "AGENT: Done. Order 5512 is cancelled and $42.50 goes back to your original payment method in 3-5 business days.",
+      "SUMMARY: Verified the customer, got a yes, then cancelled unshipped order 5512 with a $42.50 refund.",
+    ]),
+    T("T-0703", "Labeller A", "2026-10-16", [
+      "USER: My jacket from order 6120 arrived torn. I want a refund.",
+      "AGENT: Sorry about that. To get started, what's the email on your account?",
+      "USER: sam.lee@example.com",
+      'TOOL verify_customer(email=sam.lee@example.com) -> {"verified": true}',
+      'TOOL lookup_order(order_id=6120) -> {"status": "delivered", "total": 148.00, "items": ["jacket"]}',
+      "AGENT: Thanks. Order 6120 was $148.00, and refunds over $100 are approved by a colleague. Shall I pass this to them now?",
+      "USER: Yes, go ahead.",
+      'TOOL escalate(order_id=6120, reason=damaged item refund 148.00) -> {"ticket": "ESC-2291", "response_within": "24 hours"}',
+      "AGENT: Done. Your case is ESC-2291 and a colleague will reply within 24 hours.",
+      "SUMMARY: Verified the customer and escalated a $148.00 damaged-item refund on order 6120, as it is over the $100 cap.",
+    ]),
+    T("T-0704", "Labeller B", "2026-10-14", [
+      "USER: When will order 7031 get here?",
+      'TOOL lookup_order(order_id=7031) -> {"status": "shipped", "eta": "2026-10-22"}',
+      "AGENT: Good news, order 7031 has shipped and will arrive on Oct 24.",
+      "SUMMARY: Told the customer order 7031 arrives Oct 24.",
+    ]),
+    T("T-0705", "Labeller B", "2026-10-15", [
+      "USER: Can I get a refund on order 7310? The mug arrived chipped.",
+      "AGENT: Yes, order 7310 was delivered on Oct 12 and I can refund the $18.00 right away.",
+      'TOOL lookup_order(order_id=7310) -> {"status": "delivered", "total": 16.00, "delivered_on": "2026-10-12"}',
+      "AGENT: Can you confirm the email on your account so I can process it?",
+      "USER: ana.ruiz@example.com",
+      'TOOL verify_customer(email=ana.ruiz@example.com) -> {"verified": true}',
+      'TOOL issue_refund(order_id=7310, amount=16.00) -> {"refunded": 16.00}',
+      "AGENT: All done, $16.00 is on its way back to you.",
+      "SUMMARY: Refunded $16.00 for a chipped mug on order 7310.",
+    ]),
+    T("T-0706", "Labeller B", "2026-10-16", [
+      "USER: Can you change the delivery address on order 7402 to 18 Mill Lane?",
+      "AGENT: Sure. First, what's the email on your account?",
+      "USER: priya.n@example.com",
+      'TOOL verify_customer(email=priya.n@example.com) -> {"verified": true}',
+      'TOOL lookup_order(order_id=7402) -> {"status": "processing", "address": "4 Park Road"}',
+      "AGENT: Thanks. Order 7402 is still processing, so the address can change from 4 Park Road to 18 Mill Lane. Shall I update it?",
+      "USER: Yes.",
+      'TOOL update_address(order_id=7402, address=18 Mill Lane) -> {"updated": true}',
+      "AGENT: Done. Order 7402 will now go to 18 Mill Lane.",
+      "SUMMARY: Verified the customer and changed the delivery address on order 7402 to 18 Mill Lane.",
+    ]),
+    T("T-0707", "Labeller C", "2026-10-15", [
+      "USER: Please cancel order 8150, I ordered the wrong size.",
+      'TOOL lookup_order(order_id=8150) -> {"status": "processing", "total": 64.00}',
+      "AGENT: Order 8150 is still processing and can be cancelled with a $64.00 refund. Shall I go ahead?",
+      "USER: Yes, thanks.",
+      'TOOL cancel_order(order_id=8150) -> {"cancelled": true, "refund": 64.00}',
+      "AGENT: Done. Order 8150 is cancelled and $64.00 will reach your original payment method in 3-5 business days.",
+      "SUMMARY: Cancelled order 8150 with a $64.00 refund.",
+    ]),
+    T("T-0708", "Labeller C", "2026-10-16", [
+      "USER: The boots from order 8233 fell apart after a week. I want a refund.",
+      'TOOL lookup_order(order_id=8233) -> {"status": "delivered", "total": 180.00}',
+      "AGENT: Sorry to hear that. They were probably a faulty pair. Shall I refund the $180.00 now?",
+      "USER: Yes please.",
+      'TOOL issue_refund(order_id=8233, amount=180.00) -> {"refunded": 180.00}',
+      "AGENT: Done, $180.00 has been refunded.",
+      "SUMMARY: Refunded $180.00 on order 8233.",
+    ]),
+    T("T-0709", "Labeller D", "2026-10-15", [
+      "USER: Where is order 9014? Also, can I add a gift note to it?",
+      "TOOL: looked up order 9014, status shipped, eta 2026-10-23",
+      "AGENT: Thanks so much for reaching out to us today, I really appreciate your patience while I took a look at this for you. Order 9014 has shipped and is on its way to you now, and our records show that it is expected to arrive with you on Oct 23, which is only a few days away from today, so not long to wait at all.",
+    ]),
+    T("T-0710", "Labeller D", "2026-10-16", [
+      "USER: I was charged twice for order 9120. Can you fix it?",
+      'TOOL lookup_order(order_id=9120) -> {"status": "delivered", "total": 35.00, "charges": [35.00, 35.00]}',
+      "AGENT: I'm sorry about that, I can see exactly what has happened here. There are two charges of $35.00 on order 9120, which means that you were charged twice for the very same order by mistake. Before I can go ahead and refund the duplicate charge back to the card you paid with, could you please tell me the email address that is on your account so I can check it?",
+    ]),
+  ];
+  const csv = window.QA.toCSV([["task_id", "batch", "labeller", "labelled_on", "output"], ...tasks.map((t) => [t.task_id, t.batch, t.labeller, t.labelled_on, t.output])]);
+  return { spec, tasks, csv, batchId: "B-07" };
+})();
+</script>
+
+<script>
+(function () {
+  const Q = window.QA, D = window.DEMO, T = window.Tracker;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const LABEL = { accept: "Accept", rework: "Rework", reject: "Reject" };
+  const STATUS = { on_track: "On track", at_risk: "At risk", late: "Late", on_time: "On time" };
+  const pct = T.pct;
+  const state = { rubric: null, batch: null, open: null, playbook: null };
+
+  // ---------- QA tab ----------
+  const setDemo = (on) => document.querySelectorAll(".qa-demo").forEach((e) => (e.hidden = !on));
+  function loadDemo() { $("spec").value = D.spec; $("batch").value = D.csv; setDemo(true); }
+  $("loadDemo").addEventListener("click", () => { loadDemo(); run(); });
+  $("spec").addEventListener("input", () => setDemo(false));
+  $("batch").addEventListener("input", () => setDemo(false));
+  $("file").addEventListener("change", async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    $("batch").value = await f.text(); setDemo(false); e.target.value = ""; run();
+  });
+
+  function showError(msg) { $("err").hidden = !msg; $("err").textContent = msg || ""; }
+
+  function renderRubric(r) {
+    const must = r.axes.filter((a) => a.kind === "must_have").length;
+    $("rubricTitle").textContent = `Rubric for ${r.title}: 4 fixed axes + ${must} hard rule${must === 1 ? "" : "s"} from the spec`;
+    $("rubric").innerHTML = r.axes.map((a) => `
+      <li><span class="kind">${a.kind === "fixed" ? "Fixed axis" : "Hard rule · from the spec"}</span>
+      <b>${esc(a.name)}</b>${a.question ? `<span class="reason">${esc(a.question)}</span>` : ""}
+      ${a.spec_quote ? `<blockquote>${esc(a.spec_quote)}</blockquote>` : ""}
+      <span class="reason">1: ${esc(a.anchors[1])} · 3: ${esc(a.anchors[3])} · 5: ${esc(a.anchors[5])}</span></li>`).join("") +
+      (r.skipped.length ? `<li><span class="kind">Not scored as a hard rule</span>${r.skipped.map((s) => `<span class="reason">“${esc(s.text)}” (${esc(s.why)})</span>`).join("")}</li>` : "");
+    $("rubricSec").hidden = false;
+  }
+
+  function renderBatch(b) {
+    const name = (id) => state.rubric.axes.find((a) => a.id === id).name;
+    $("bTitle").textContent = `${b.batch}: ${b.tasks.length} task${b.tasks.length === 1 ? "" : "s"} reviewed`;
+    $("bStats").innerHTML = [["Pass rate", pct(b.passRate)], ["Accept", b.accepted], ["Rework", b.rework], ["Reject", b.rejected]]
+      .map(([k, v]) => `<div><span class="k">${k}</span><span class="v">${v}</span></div>`).join("");
+    const worst = [...b.labellers].sort((x, y) => x.passRate - y.passRate)[0];
+    $("bSummary").textContent = b.topIssue
+      ? `The most common failure is ${b.topIssue.name.toLowerCase()}: ${b.topIssue.count} of ${b.tasks.length} tasks at 2 or below. ${worst && worst.passRate < b.passRate ? `${worst.name} has the lowest pass rate at ${pct(worst.passRate)}${worst.topIssue ? `, mostly on ${worst.topIssue.name.toLowerCase()}` : ""}.` : ""}`
+      : "No task scored 2 or below on any axis.";
+    $("labBody").innerHTML = b.labellers.map((l) => `<tr><td><b>${esc(l.name)}</b></td><td class="n">${l.tasks}</td><td class="n fig">${pct(l.passRate)}</td><td class="n">${l.rework}</td><td class="n">${l.rejected}</td><td>${l.topIssue ? esc(l.topIssue.name) : `<span class="hint">none</span>`}</td></tr>`).join("");
+    $("taskBody").innerHTML = b.tasks.map((t, i) => {
+      const r = t.result;
+      return `<tr class="pick" tabindex="0" data-i="${i}"><td><b>${esc(t.task_id)}</b></td><td>${esc(t.labeller)}</td><td class="n fig">${r.recommendation.mean.toFixed(2)}</td><td><span class="badge ${r.recommendation.decision}">${LABEL[r.recommendation.decision]}</span></td><td>${esc(name(r.weakest_axis_id))}</td></tr>`;
+    }).join("");
+    $("batchSec").hidden = false;
+  }
+
+  function openTask(i, scroll) {
+    state.open = i;
+    const t = state.batch.tasks[i], r = t.result;
+    const axes = new Map(state.rubric.axes.map((a) => [a.id, a]));
+    $("tName").textContent = `${t.task_id} · ${t.labeller}`;
+    $("tSummary").textContent = r.summary;
+    $("tDecision").className = `badge ${r.recommendation.decision}`;
+    $("tDecision").textContent = LABEL[r.recommendation.decision];
+    $("tMean").textContent = `Mean ${r.recommendation.mean.toFixed(2)} / 5`;
+    $("scores").innerHTML = r.scores.map((sc) => {
+      const a = axes.get(sc.axis_id);
+      const scoreCell = sc.score == null
+        ? `<span class="badge na">n/a</span>`
+        : `<span class="dots" aria-hidden="true">${[1, 2, 3, 4, 5].map((k) => `<span class="dot${k <= sc.score ? " on" : ""}"></span>`).join("")}</span><span class="num">${sc.score}/5</span>`;
+      const ev = sc.evidence.map((e) => `<blockquote class="${sc.negative ? "neg" : ""}">${esc(e.text)}</blockquote>`).join("");
+      return `<tr><td class="axis">${esc(a.name)}<small>${a.kind === "must_have" ? "hard rule" : "fixed axis"}</small></td>
+        <td class="score">${scoreCell}</td><td>${ev}<div class="reason">${esc(sc.reasoning)}</div></td></tr>`;
+    }).join("");
+    $("taskBody").querySelectorAll("tr").forEach((tr) => tr.classList.toggle("on", Number(tr.dataset.i) === i));
+    $("cardSec").hidden = false;
+    if (scroll) $("cardSec").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  const pickRow = (e) => { const tr = e.target.closest("tr[data-i]"); if (tr) openTask(Number(tr.dataset.i), true); };
+  $("taskBody").addEventListener("click", pickRow);
+  $("taskBody").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickRow(e); } });
+
+  function renderPlaybook() {
+    const pb = Q.playbook(state.rubric, state.batch);
+    state.playbook = pb;
+    const q = (lab, x) => (x ? `<div class="pair"><span class="lab">${lab} · ${esc(x.task)}</span><blockquote class="${lab === "Fails" ? "neg" : ""}">${esc(x.text)}</blockquote></div>` : "");
+    $("pb").innerHTML = pb.sections.map((s) => `<section><h4>${esc(s.title)}</h4><ol>${s.items.map((it) => `<li>${esc(it.text)}${it.sub ? `<span class="sub">${esc(it.sub)}</span>` : ""}${it.spec ? `<span class="sub">Spec: “${esc(it.spec)}”</span>` : ""}${q("Passes", it.pass)}${q("Fails", it.fail)}</li>`).join("")}</ol></section>`).join("");
+    $("pbSec").hidden = false;
+  }
+
+  function run() {
+    showError(null);
+    const spec = $("spec").value.trim(), csv = $("batch").value.trim();
+    if (!spec || !csv) return showError("Paste a task spec and a batch CSV first.");
+    try {
+      const t = performance.now();
+      const rows = Q.parseCSV(csv);
+      if (!rows.length) throw new Error("No rows found. The CSV needs a header row and at least one task.");
+      state.rubric = Q.buildRubric(spec);
+      state.batch = Q.qaBatch(state.rubric, rows);
+      renderRubric(state.rubric);
+      renderBatch(state.batch);
+      const first = state.batch.tasks.findIndex((x) => x.result.recommendation.decision !== "accept");
+      openTask(first >= 0 ? first : 0, false);
+      renderPlaybook();
+      $("trackMsg").textContent = "";
+      $("status").textContent = `${rows.length} task${rows.length === 1 ? "" : "s"} scored in ${Math.max(1, Math.round(performance.now() - t))} ms.`;
+    } catch (e) { showError(e.message); }
+  }
+  $("run").addEventListener("click", run);
+
+  async function copyText(text, btn, label) {
+    try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; }
+    catch { btn.textContent = "Copy blocked by the browser"; }
+    setTimeout(() => (btn.textContent = label), 1600);
+  }
+  $("copyPb").addEventListener("click", (e) => copyText(state.playbook.text, e.currentTarget, "Copy playbook"));
+
+  // ---------- Tracker ----------
+  const KEY = "qa-desk-tracker-v1";
+  const trk = { items: [], armed: null };
+  function load() {
+    try { const raw = localStorage.getItem(KEY); if (raw) { const d = JSON.parse(raw); if (Array.isArray(d.items)) return d.items; } } catch {}
+    return T.demo(Date.now());
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ items: trk.items })); } catch {} }
+  trk.items = load();
+
+  function setTab(name) {
+    const tracker = name === "tracker";
+    $("tabQa").setAttribute("aria-selected", String(!tracker));
+    $("tabTracker").setAttribute("aria-selected", String(tracker));
+    $("panelQa").hidden = tracker;
+    $("panelTracker").hidden = !tracker;
+    if (tracker) renderTracker();
+    try { history.replaceState(null, "", tracker ? "#tracker" : "#qa"); } catch {}
+  }
+  $("tabQa").addEventListener("click", () => setTab("qa"));
+  $("tabTracker").addEventListener("click", () => setTab("tracker"));
+  $("tabQa").parentElement.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const t = $("tabQa").getAttribute("aria-selected") === "true" ? "tracker" : "qa"; setTab(t); $(t === "tracker" ? "tabTracker" : "tabQa").focus(); }
+  });
+
+  function renderHeadline() {
+    const now = Date.now(), w = T.week(trk.items, now);
+    const demo = trk.items.some((b) => b.demo) ? ` <span class="badge demo">Demo data</span>` : "";
+    const risk = w.atRisk[0];
+    const late = risk && Math.max(1, Math.ceil(-risk.m.slack));
+    const riskText = risk
+      ? `<span class="v risk">${esc(risk.b.id)}</span><span class="s">${esc(risk.b.name || risk.b.client)}, due ${T.fmtDay(risk.m.deadline)}. ${risk.m.status === "late" ? "Past its deadline." : `Projects ${late} day${late === 1 ? "" : "s"} late at ${risk.m.pace.toFixed(1)} tasks a day.`}</span>`
+      : `<span class="v">None</span><span class="s">Every active batch projects to land on time.</span>`;
+    $("headline").innerHTML = `
+      <div><span class="k">Pass rate this week${demo}</span><span class="v">${pct(w.passRate)}</span><span class="s">${w.accepted} of ${w.reviewed} reviewed tasks accepted; ${pct(w.reworkRate)} sent to rework.</span></div>
+      <div><span class="k">Cost per accepted task</span><span class="v">${w.perAccepted ? T.money2(w.perAccepted) : "n/a"}</span><span class="s">${T.money(w.cost)} spent this week, ${T.money(w.reworkCost)} of it on rework.</span></div>
+      <div><span class="k">Batch at risk</span>${riskText}</div>`;
+  }
+
+  const stageCell = (b) => `<select data-id="${esc(b.id)}" aria-label="Stage for ${esc(b.id)}">${T.STAGES.map((st) => `<option${st === b.stage ? " selected" : ""}>${st}</option>`).join("")}</select>`;
+
+  function renderTracker() {
+    const now = Date.now(), items = trk.items, pace = T.defaultPace(items, now);
+    const demo = items.some((b) => b.demo);
+    $("trackerCount").textContent = `(${items.filter(T.active).length})`;
+    $("demoBar").hidden = !demo;
+    document.querySelectorAll(".trk-demo").forEach((e) => (e.hidden = !demo));
+    renderHeadline();
+    $("note").textContent = items.length ? T.note(items, now, demo) : "No batches yet. Add one below, or send a QA result from the first tab.";
+
+    const bn = T.bottlenecks(items, now);
+    $("attention").innerHTML = bn.length
+      ? bn.map((x) => `<li><div class="top"><span class="badge ${x.m.status === "on_track" ? "rework" : x.m.status}">${x.m.status === "on_track" ? `${x.over}d over SLA` : STATUS[x.m.status]}</span><span class="who">${esc(x.b.id)}</span><span>${esc(x.b.name)} · ${esc(x.b.stage)}</span></div><span class="meta">${esc(x.action)}</span></li>`).join("")
+      : `<li class="empty">Nothing is over its SLA or at risk of missing a deadline.</li>`;
+    $("stageBody").innerHTML = T.stages(items, now).map((s) => `<tr><td>${s.stage}</td><td class="n">${s.n}</td><td class="n">${s.sla == null ? "–" : s.sla + "d"}</td><td class="n">${s.over ? `<span class="late-t">${s.over}</span>` : "0"}</td></tr>`).join("");
+
+    const order = (b) => (T.active(b) ? 0 : 1);
+    const rows = [...items].sort((a, b) => order(a) - order(b) || Date.parse(a.deadline) - Date.parse(b.deadline));
+    $("trkBody").innerHTML = rows.length ? rows.map((b) => {
+      const m = T.metrics(b, now, pace), d = T.daysIn(b, now), late = T.active(b) && d > T.SLA[b.stage];
+      const armed = trk.armed === b.id;
+      return `<tr><td><b>${esc(b.id)}</b> ${esc(b.name)}<span class="tagline">${esc(b.client)}${b.demo ? " · synthetic" : ""} · $${b.rate}/task</span></td>
+        <td>${stageCell(b)}<span class="tagline${late ? " late-t" : ""}">${d} day${d === 1 ? "" : "s"} in stage${late ? ` · SLA ${T.SLA[b.stage]}d` : ""}</span></td>
+        <td class="n">${b.labelled}/${b.tasks}</td><td class="n">${m.throughput ? m.throughput.toFixed(1) : "–"}</td>
+        <td class="n fig">${pct(m.passRate)}</td><td class="n">${pct(m.reworkRate)}</td><td class="n">${T.money(m.cost)}</td><td class="n fig">${m.perAccepted ? T.money2(m.perAccepted) : "–"}</td>
+        <td>${T.fmtDay(m.deadline)}<span class="tagline"><span class="badge ${m.status}">${STATUS[m.status]}</span></span></td>
+        <td><button class="${armed ? "" : "link"}" data-remove="${esc(b.id)}">${armed ? "Confirm remove" : "Remove"}</button></td></tr>`;
+    }).join("") : `<tr><td colspan="10" class="empty">No batches yet.</td></tr>`;
+
+    const labs = T.labellers(items, now);
+    $("labTrkBody").innerHTML = labs.length ? labs.map((l) => `<tr><td><b>${esc(l.name)}</b></td><td class="n">${l.tasks}</td><td class="n">${l.perDay.toFixed(1)}</td><td class="n fig">${pct(l.passRate)}</td><td class="n">${pct(l.reworkRate)}</td><td class="n">${T.money(l.cost)}</td><td>${l.topIssue ? esc(l.topIssue) : `<span class="hint">none</span>`}</td></tr>`).join("")
+      : `<tr><td colspan="7" class="empty">No labeller data yet.</td></tr>`;
+  }
+
+  $("trkBody").addEventListener("change", (e) => {
+    const sel = e.target.closest("select[data-id]"); if (!sel) return;
+    trk.items = trk.items.map((b) => (b.id === sel.dataset.id ? T.move(b, sel.value, Date.now()) : b));
+    save(); renderTracker();
+  });
+  $("trkBody").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-remove]"); if (!b) return;
+    if (trk.armed === b.dataset.remove) { trk.items = trk.items.filter((x) => x.id !== b.dataset.remove); trk.armed = null; save(); }
+    else trk.armed = b.dataset.remove;
+    renderTracker();
+  });
+  $("clearDemo").addEventListener("click", () => { trk.items = trk.items.filter((b) => !b.demo); save(); renderTracker(); });
+  $("copyNote").addEventListener("click", (e) => copyText($("note").textContent, e.currentTarget, "Copy note"));
+  $("copyCsv").addEventListener("click", (e) => copyText(T.csv(trk.items, Date.now()), e.currentTarget, "Copy as CSV"));
+  $("addId").addEventListener("input", (e) => e.target.setCustomValidity(""));
+  $("addForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const id = $("addId").value.trim(); if (!id) return;
+    if (trk.items.some((b) => b.id === id)) { $("addId").setCustomValidity("That batch already exists."); $("addId").reportValidity(); return; }
+    const now = new Date().toISOString();
+    trk.items.push({ id, name: $("addName").value.trim(), client: $("addClient").value.trim(), stage: "Queued", moved: now, deadline: new Date($("addDue").value + "T18:00:00Z").toISOString(),
+      tasks: Number($("addTasks").value), labelled: 0, reviewed: 0, accepted: 0, rework: 0, rejected: 0, rate: Number($("addRate").value), labellers: [] });
+    save(); e.target.reset(); $("addRate").value = 25; renderTracker();
+  });
+
+  // QA results into the tracker. The batch's QA counts and each labeller's results are replaced by this
+  // sample, and the batch never moves backwards a stage.
+  $("track").addEventListener("click", () => {
+    const b = state.batch, now = Date.now(), iso = new Date(now).toISOString();
+    const existing = trk.items.find((x) => x.id === b.batch);
+    const base = existing || { id: b.batch, name: "", client: "Unassigned", stage: "QA", moved: iso, started: iso, deadline: new Date(now + 7 * 864e5).toISOString(), tasks: b.tasks.length, labelled: b.tasks.length, rate: 25, labellers: [] };
+    const labs = new Map((base.labellers || []).map((l) => [l.name, l]));
+    for (const l of b.labellers) {
+      const prev = labs.get(l.name) || { name: l.name, tasks: 0 };
+      labs.set(l.name, { ...prev, tasks: Math.max(prev.tasks, l.tasks), reviewed: l.tasks, accepted: l.accepted, rework: l.rework, rejected: l.rejected, topIssue: l.topIssue ? l.topIssue.name : null });
+    }
+    const labelled = Math.max(base.labelled || 0, [...labs.values()].reduce((s, l) => s + l.tasks, 0));
+    let rec = { ...base, labelled, tasks: Math.max(base.tasks, labelled), reviewed: b.tasks.length, accepted: b.accepted, rework: b.rework, rejected: b.rejected, labellers: [...labs.values()] };
+    if (T.STAGES.indexOf(rec.stage) < T.STAGES.indexOf("Labelling")) rec = T.move(rec, "Labelling", now);
+    trk.items = existing ? trk.items.map((x) => (x.id === existing.id ? rec : x)) : [...trk.items, rec];
+    save(); renderTracker();
+    $("trackMsg").innerHTML = `${existing ? "Updated" : "Added"} ${esc(b.batch)} with this QA sample. <button class="link" id="goTracker">Open the tracker</button>`;
+    $("goTracker").addEventListener("click", () => { setTab("tracker"); window.scrollTo({ top: 0, behavior: "smooth" }); });
+  });
+
+  renderTracker();
+  if (location.hash === "#tracker") setTab("tracker");
+
+  // Open in a working state: the demo batch scored, with the first task that needs attention on screen.
+  loadDemo();
+  run();
+})();
+</script>
+</body>
+</html>
