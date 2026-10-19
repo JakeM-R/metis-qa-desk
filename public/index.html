@@ -89,7 +89,7 @@ h3 { font: 400 26px/1.2 var(--font-display); margin: 0; letter-spacing: -0.015em
 label.field { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .hint { font-weight: 400; color: var(--ink-3); font-size: 13px; text-transform: none; letter-spacing: 0; }
 textarea {
-  width: 100%; min-height: 340px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  width: 100%; min-height: 260px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius);
   font: 12.5px/1.55 var(--font-mono); color: var(--ink); background: #fff; resize: vertical;
 }
 textarea:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, tr:focus-visible, .filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -177,6 +177,27 @@ pre.note { margin: 0; white-space: pre-wrap; font: 14.5px/1.7 var(--font-ui); ba
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent-fill); }
 .tabs .count { color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .panel { display: grid; gap: 36px; min-width: 0; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.fold { background: var(--surface); border-radius: var(--panel-radius); padding: 0; }
+.fold > summary { list-style: none; cursor: pointer; padding: 14px 20px; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::before { content: ""; width: 7px; height: 7px; background: var(--pixel); align-self: center; transition: transform 140ms ease-out; }
+.fold[open] > summary::before { transform: rotate(45deg); }
+.fold-t { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 500; }
+.fold-m { font-size: 13px; color: var(--ink-3); }
+.fold-b { padding: 0 20px 20px; }
+.fold.inner { background: var(--bg); border-radius: 10px; }
+.fold.inner > summary { padding: 10px 14px; }
+.fold.inner .fold-b { padding: 0 14px 14px; margin: 0; }
+#moreSec { gap: 10px; }
+.prose p { margin: 0 0 8px; color: var(--ink-2); font-size: 14px; max-width: 76ch; }
+pre.traj { white-space: pre-wrap; font: 12.5px/1.6 var(--font-mono); overflow-wrap: anywhere; }
+.stagestrip { display: flex; flex-wrap: wrap; gap: 6px 20px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 13px; color: var(--ink-2); }
+.stagestrip b { font: 400 16px var(--font-display); color: var(--ink); }
+.stagestrip .late-t b { color: var(--warn); }
+table.tasks td { padding-block: 9px; }
+.m-only { display: none; }
+@media (max-width: 760px) { .d-only { display: none; } .m-only { display: block; } }
 .demo-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--accent-soft); color: var(--ink); padding: 12px 16px; border-radius: var(--panel-radius); font-size: 14px; }
 footer { font-size: 13px; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 16px; display: grid; gap: 6px; }
 footer p { margin: 0; max-width: 90ch; }
@@ -184,10 +205,14 @@ footer p { margin: 0; max-width: 90ch; }
   .wrap { padding-block: 24px 56px; gap: 28px; }
   header h1 { font-size: 40px; }
   .grid, .two { grid-template-columns: 1fr; }
-  .headline-row { grid-template-columns: 1fr; }
-  .headline-row > div, .headline-row > div + div { padding: 14px 0; border-left: 0; }
-  .headline-row > div + div { border-top: 1px solid var(--line); }
-  .headline-row .v { font-size: 36px; }
+  .headline-row > div { padding: 12px 8px 12px 0; }
+  .headline-row > div + div { padding-left: 10px; }
+  .headline-row .k { font-size: 10px; letter-spacing: 0.06em; }
+  .headline-row .k::before, .headline-row .k .badge { display: none; }
+  .headline-row .v { font-size: 26px; }
+  .headline-row .s { display: none; }
+  .trk td:first-child, .trk th:first-child { min-width: 150px; }
+  td b { white-space: nowrap; }
   .card { padding: 18px; border-radius: 14px; }
   textarea { min-height: 220px; }
   table.scores, table.scores tbody, table.scores tr, table.scores td { display: block; width: 100%; }
@@ -205,8 +230,8 @@ footer p { margin: 0; max-width: 90ch; }
 <div class="wrap">
   <header>
     <h1>QA Desk</h1>
-    <p>QA for post-training data. Paste a task spec and a batch of task outputs. It builds a rubric from the spec, scores every output with the line behind each score, and recommends accept, rework or reject. The tracker follows each batch from queue to delivery on throughput, quality, cost and timeliness, flags the bottleneck, and writes the weekly note for leadership.</p>
-    <div class="byline">Built by Jake Makking-Robinson for the Metis operations role. A working draft, not a Metis product and not affiliated with Metis. All data on this page is synthetic.</div>
+    <p>Score a batch of post-training data against its spec, track every batch to delivery, and send the weekly note.</p>
+    <div class="byline">Jake Makking-Robinson · for the Metis operations role · not affiliated with Metis · synthetic data</div>
   </header>
 
   <div class="headline-row" id="headline" aria-label="This week"></div>
@@ -217,62 +242,55 @@ footer p { margin: 0; max-width: 90ch; }
   </nav>
 
   <div id="panelQa" class="panel" role="tabpanel" aria-labelledby="tabQa">
-  <section aria-labelledby="h-inputs">
-    <h2 id="h-inputs">1 · Inputs <span class="badge demo qa-demo">Demo data</span></h2>
-    <div class="grid">
-      <div>
-        <label class="field" for="spec">Task spec <span class="hint">the labelling or eval guidelines</span></label>
-        <textarea id="spec" spellcheck="false"></textarea>
-      </div>
-      <div>
-        <label class="field" for="batch">Task outputs, as CSV <span class="hint">task_id, batch, labeller, labelled_on, output</span></label>
-        <textarea id="batch" spellcheck="false" placeholder="Paste a CSV, or load a file. One row per task; the output column holds the full trajectory."></textarea>
-        <div class="actions">
-          <label class="filebtn">Load CSV file<input type="file" id="file" accept=".csv,text/csv,text/plain"></label>
-          <button id="loadDemo">Reload demo batch</button>
-        </div>
-      </div>
-    </div>
-    <div class="actions">
+  <section aria-label="Inputs">
+    <div class="toolbar">
       <button class="primary" id="run">QA the batch</button>
+      <label class="filebtn">Upload CSV<input type="file" id="file" accept=".csv,text/csv,text/plain"></label>
+      <button id="template">CSV template</button>
+      <button id="loadDemo">Demo batch</button>
       <span class="status" id="status" role="status" aria-live="polite"></span>
     </div>
     <div id="err" class="error" hidden></div>
-  </section>
-
-  <section id="batchSec" hidden aria-labelledby="h-batch">
-    <h2 id="h-batch">2 · Batch result <span class="badge demo qa-demo">Demo data</span></h2>
-    <div class="card">
-      <div class="head">
-        <h3 id="bTitle"></h3>
-        <div class="actions"><button id="track">Send results to tracker</button><span class="status" id="trackMsg" role="status" aria-live="polite"></span></div>
+    <details class="fold" id="inputsBox">
+      <summary><span class="fold-t">Spec and outputs</span><span class="fold-m" id="inputsMeta"></span></summary>
+      <div class="grid fold-b">
+        <div>
+          <label class="field" for="spec">Task spec</label>
+          <textarea id="spec" spellcheck="false" placeholder="Paste the labelling or eval guidelines. Put each rule on its own line starting with a dash."></textarea>
+        </div>
+        <div>
+          <label class="field" for="batch">Task outputs (CSV)</label>
+          <textarea id="batch" spellcheck="false" placeholder="task_id,batch,labeller,labelled_on,output"></textarea>
+        </div>
       </div>
-      <div class="stats" id="bStats"></div>
-      <p class="summary" id="bSummary" style="margin:0"></p>
-    </div>
-    <div class="card flat">
-      <div class="tablebox">
-        <table><thead><tr><th>Labeller</th><th class="n">Tasks</th><th class="n">Pass</th><th class="n">Rework</th><th class="n">Reject</th><th>Top issue</th></tr></thead><tbody id="labBody"></tbody></table>
-      </div>
-    </div>
-    <div class="card flat">
-      <div class="tablebox">
-        <table><thead><tr><th>Task</th><th>Labeller</th><th class="n">Mean</th><th>Recommendation</th><th>Weakest axis</th></tr></thead><tbody id="taskBody"></tbody></table>
-      </div>
-    </div>
-    <p class="hint" style="margin:0">Click a task to open its scorecard.</p>
-  </section>
-
-  <section id="rubricSec" hidden aria-labelledby="h-rubric">
-    <h2 id="h-rubric">3 · Rubric</h2>
-    <details id="rubricBox">
-      <summary id="rubricTitle">Rubric</summary>
-      <ul class="axislist" id="rubric"></ul>
     </details>
   </section>
 
-  <section id="cardSec" hidden aria-labelledby="h-card">
-    <h2 id="h-card">4 · Scorecard <span class="badge demo qa-demo">Demo data</span></h2>
+  <section id="batchSec" hidden aria-labelledby="bTitle">
+    <div class="card">
+      <div class="head">
+        <h3 id="bTitle"></h3>
+        <div class="actions"><span class="badge demo qa-demo">Demo data</span><button id="track">Send to tracker</button></div>
+      </div>
+      <div class="stats" id="bStats"></div>
+      <p class="summary" id="bSummary" style="margin:0"></p>
+      <span class="status" id="trackMsg" role="status" aria-live="polite"></span>
+    </div>
+    <div class="two">
+      <div class="card flat">
+        <div class="tablebox">
+          <table class="tasks"><thead><tr><th>Task</th><th class="d-only">Labeller</th><th class="n">Mean</th><th>Verdict</th><th class="d-only">Weakest</th></tr></thead><tbody id="taskBody"></tbody></table>
+        </div>
+      </div>
+      <div class="card flat">
+        <div class="tablebox">
+          <table><thead><tr><th>Labeller</th><th class="n">Pass</th><th class="n">Rework</th><th class="n">Reject</th><th class="d-only">Top issue</th></tr></thead><tbody id="labBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cardSec" hidden aria-labelledby="tName">
     <div class="card">
       <div class="head">
         <div>
@@ -282,66 +300,69 @@ footer p { margin: 0; max-width: 90ch; }
         <div class="mean"><span id="tDecision" class="badge"></span><span id="tMean"></span></div>
       </div>
       <div class="tablebox">
-        <table class="scores"><thead><tr><th>Axis</th><th>Score</th><th>Evidence, quoted from the output</th></tr></thead><tbody id="scores"></tbody></table>
+        <table class="scores"><thead><tr><th>Axis</th><th>Score</th><th>Evidence from the output</th></tr></thead><tbody id="scores"></tbody></table>
       </div>
+      <details class="fold inner">
+        <summary><span class="fold-t">Full trajectory</span></summary>
+        <pre class="traj fold-b" id="traj"></pre>
+      </details>
     </div>
   </section>
 
-  <section id="pbSec" hidden aria-labelledby="h-pb">
-    <h2 id="h-pb">5 · Reviewer playbook <span class="badge demo qa-demo">Demo data</span></h2>
-    <div class="card">
-      <div class="head">
-        <p class="summary" style="margin:0">For a new labeller joining this spec. Written from the rubric, with examples quoted from this batch.</p>
+  <section id="moreSec" hidden aria-label="Rubric, playbook and method">
+    <details class="fold" id="rubricBox">
+      <summary><span class="fold-t">Rubric</span><span class="fold-m" id="rubricTitle"></span></summary>
+      <ul class="axislist fold-b" id="rubric"></ul>
+    </details>
+    <details class="fold" id="pbBox">
+      <summary><span class="fold-t">Reviewer playbook</span><span class="fold-m">for new labellers on this spec</span></summary>
+      <div class="fold-b">
         <div class="actions"><button id="copyPb">Copy playbook</button></div>
+        <div class="pb" id="pb"></div>
       </div>
-      <div class="pb" id="pb"></div>
-    </div>
+    </details>
+    <details class="fold">
+      <summary><span class="fold-t">How it scores</span></summary>
+      <div class="fold-b prose">
+        <p>Four fixed axes (correctness, guideline adherence, completeness, format) plus up to four hard rules from the spec. Correctness checks every amount, date and status against the tool results. Quotes are copied from the output, never written.</p>
+        <p>Two broken rules or a mean under 2.5: reject. One broken rule or any axis under 3: rework. A rule the task never triggers is n/a.</p>
+        <p>A rules engine in the browser: no model, no server. In production a calibrated model grader would replace the matching step; the rubric, quotes and rule stay.</p>
+      </div>
+    </details>
   </section>
-
-  <footer>
-    <p><b>How it scores.</b> Four axes are fixed: correctness, guideline adherence, completeness and format, each with 1/3/5 anchors. Hard rules come from the spec's own lines, and lines about tone or format feed the fixed axes instead. Correctness checks every amount, date and order status the agent states against the tool results, the customer and the spec. Every quote is copied from the output, never written. The recommendation is a fixed rule: two broken hard rules or a mean under 2.5 rejects; one broken rule, or any axis under 3, sends it back for rework.</p>
-    <p><b>What this version is.</b> A transparent rules engine that runs in your browser: no model, no server, nothing stored except the tracker in your own browser. Every spec, trajectory, labeller, client and batch is synthetic. A production version would swap the matching step for a model grader calibrated against human reviewers, and keep the same rubric, quoting and decision rule.</p>
-  </footer>
   </div>
 
   <div id="panelTracker" class="panel" role="tabpanel" aria-labelledby="tabTracker" hidden>
-    <div id="demoBar" class="demo-bar" hidden><span>Demo data. Every batch, client and labeller is synthetic.</span><button id="clearDemo">Clear demo batches</button></div>
+    <div id="demoBar" class="demo-bar" hidden><span>Demo data: synthetic batches, clients and labellers.</span><button id="clearDemo">Clear demo</button></div>
 
-    <section aria-labelledby="h-note">
-      <h2 id="h-note">Weekly note · ready to send <span class="badge demo trk-demo">Demo data</span></h2>
-      <div class="card">
-        <pre class="note" id="note"></pre>
-        <div class="actions"><button id="copyNote">Copy note</button><span class="hint">Plain text, so it pastes into Slack or email as it is.</span></div>
-      </div>
+    <section aria-label="Weekly note">
+      <details class="fold">
+        <summary><span class="fold-t">Weekly note</span><span class="fold-m">ready to send to leadership</span></summary>
+        <div class="fold-b"><pre class="note" id="note"></pre></div>
+      </details>
+      <div class="actions"><button id="copyNote">Copy weekly note</button><span class="badge demo trk-demo">Demo data</span></div>
     </section>
 
     <section aria-labelledby="h-bott">
-      <h2 id="h-bott">Bottlenecks <span class="badge demo trk-demo">Demo data</span></h2>
-      <div class="two">
-        <div class="card">
-          <h2>Needs attention</h2>
-          <ul class="attn" id="attention"></ul>
-        </div>
-        <div class="card flat">
-          <div class="tablebox">
-            <table><thead><tr><th>Stage</th><th class="n">Batches</th><th class="n">SLA</th><th class="n">Over SLA</th></tr></thead><tbody id="stageBody"></tbody></table>
-          </div>
-        </div>
+      <h2 id="h-bott">Bottlenecks</h2>
+      <div class="card">
+        <ul class="attn" id="attention"></ul>
+        <div class="stagestrip" id="stageBody"></div>
       </div>
     </section>
 
     <section aria-labelledby="h-batches">
-      <h2 id="h-batches">Batches <span class="badge demo trk-demo">Demo data</span></h2>
+      <h2 id="h-batches">Batches</h2>
       <div class="card flat">
         <div class="tablebox">
           <table class="trk"><thead><tr><th>Batch</th><th>Stage</th><th class="n">Labelled</th><th class="n">Tasks/day</th><th class="n">Pass</th><th class="n">Rework</th><th class="n">Cost</th><th class="n">Per accepted</th><th>Deadline</th><th></th></tr></thead><tbody id="trkBody"></tbody></table>
         </div>
       </div>
-      <div class="actions"><button id="copyCsv">Copy as CSV</button><span class="hint">Cost is tasks × rate, with reworked tasks paid again. Per accepted divides the cost of reviewed tasks by the ones accepted.</span></div>
+      <div class="actions"><button id="copyCsv">Download CSV</button></div>
     </section>
 
     <section aria-labelledby="h-lab">
-      <h2 id="h-lab">Labellers <span class="badge demo trk-demo">Demo data</span></h2>
+      <h2 id="h-lab">Labellers</h2>
       <div class="card flat">
         <div class="tablebox">
           <table><thead><tr><th>Labeller</th><th class="n">Tasks</th><th class="n">Tasks/day</th><th class="n">Pass</th><th class="n">Rework</th><th class="n">Cost</th><th>Top issue</th></tr></thead><tbody id="labTrkBody"></tbody></table>
@@ -349,18 +370,26 @@ footer p { margin: 0; max-width: 90ch; }
       </div>
     </section>
 
-    <section aria-labelledby="h-add">
-      <h2 id="h-add">Add a batch</h2>
-      <form class="card addform" id="addForm">
-        <label for="addId">Batch<input id="addId" required autocomplete="off" placeholder="B-09"></label>
-        <label for="addName">Name<input id="addName" autocomplete="off" placeholder="Exchanges"></label>
-        <label for="addClient">Client<input id="addClient" required autocomplete="off" placeholder="Client D"></label>
-        <label for="addTasks">Tasks<input id="addTasks" type="number" min="1" required></label>
-        <label for="addRate">Rate per task ($)<input id="addRate" type="number" min="0" step="0.5" value="25" required></label>
-        <label for="addDue">Customer deadline<input id="addDue" type="date" required></label>
-        <button class="primary" type="submit">Add batch</button>
-      </form>
-      <p class="hint" style="margin:0">The tracker saves to this browser only. Nothing is sent anywhere, and anyone else opening the link sees their own copy.</p>
+    <section aria-label="Add a batch and method">
+      <details class="fold">
+        <summary><span class="fold-t">Add a batch</span></summary>
+        <form class="addform fold-b" id="addForm">
+          <label for="addId">Batch<input id="addId" required autocomplete="off" placeholder="B-09"></label>
+          <label for="addName">Name<input id="addName" autocomplete="off" placeholder="Exchanges"></label>
+          <label for="addClient">Client<input id="addClient" required autocomplete="off" placeholder="Client D"></label>
+          <label for="addTasks">Tasks<input id="addTasks" type="number" min="1" required></label>
+          <label for="addRate">Rate per task ($)<input id="addRate" type="number" min="0" step="0.5" value="25" required></label>
+          <label for="addDue">Customer deadline<input id="addDue" type="date" required></label>
+          <button class="primary" type="submit">Add batch</button>
+        </form>
+      </details>
+      <details class="fold">
+        <summary><span class="fold-t">How the numbers work</span></summary>
+        <div class="fold-b prose">
+          <p>SLAs: Queued 1 day, Labelling 4, QA 1, Rework 2. Cost is tasks × rate, with rework paid again. Per accepted divides the cost of reviewed tasks by the accepted ones.</p>
+          <p>An active batch is projected from its current pace plus one QA pass. "This week" is every active batch plus anything delivered in the last seven days. The tracker saves to this browser only.</p>
+        </div>
+      </details>
     </section>
   </div>
 </div>
@@ -1153,10 +1182,18 @@ Reference
   const LABEL = { accept: "Accept", rework: "Rework", reject: "Reject" };
   const STATUS = { on_track: "On track", at_risk: "At risk", late: "Late", on_time: "On time" };
   const pct = T.pct;
-  const state = { rubric: null, batch: null, open: null, playbook: null };
+  const state = { rubric: null, batch: null, open: null, playbook: null, demo: false };
 
   // ---------- QA tab ----------
-  const setDemo = (on) => document.querySelectorAll(".qa-demo").forEach((e) => (e.hidden = !on));
+  const setDemo = (on) => { state.demo = on; document.querySelectorAll(".qa-demo").forEach((e) => (e.hidden = !on)); };
+  function download(name, text) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  const TEMPLATE = Q.toCSV([["task_id", "batch", "labeller", "labelled_on", "output"], ...D.tasks.slice(0, 1).map((t) => [t.task_id, t.batch, t.labeller, t.labelled_on, t.output])]);
+  $("template").addEventListener("click", () => download("qa-desk-template.csv", TEMPLATE + "\n"));
   function loadDemo() { $("spec").value = D.spec; $("batch").value = D.csv; setDemo(true); }
   $("loadDemo").addEventListener("click", () => { loadDemo(); run(); });
   $("spec").addEventListener("input", () => setDemo(false));
@@ -1166,33 +1203,34 @@ Reference
     $("batch").value = await f.text(); setDemo(false); e.target.value = ""; run();
   });
 
-  function showError(msg) { $("err").hidden = !msg; $("err").textContent = msg || ""; }
+  function showError(msg) { $("err").hidden = !msg; $("err").textContent = msg || ""; if (msg) $("inputsBox").open = true; }
 
   function renderRubric(r) {
     const must = r.axes.filter((a) => a.kind === "must_have").length;
-    $("rubricTitle").textContent = `Rubric for ${r.title}: 4 fixed axes + ${must} hard rule${must === 1 ? "" : "s"} from the spec`;
+    $("rubricTitle").textContent = `4 fixed axes + ${must} hard rule${must === 1 ? "" : "s"} from the spec`;
     $("rubric").innerHTML = r.axes.map((a) => `
       <li><span class="kind">${a.kind === "fixed" ? "Fixed axis" : "Hard rule · from the spec"}</span>
       <b>${esc(a.name)}</b>${a.question ? `<span class="reason">${esc(a.question)}</span>` : ""}
       ${a.spec_quote ? `<blockquote>${esc(a.spec_quote)}</blockquote>` : ""}
       <span class="reason">1: ${esc(a.anchors[1])} · 3: ${esc(a.anchors[3])} · 5: ${esc(a.anchors[5])}</span></li>`).join("") +
       (r.skipped.length ? `<li><span class="kind">Not scored as a hard rule</span>${r.skipped.map((s) => `<span class="reason">“${esc(s.text)}” (${esc(s.why)})</span>`).join("")}</li>` : "");
-    $("rubricSec").hidden = false;
+    $("moreSec").hidden = false;
   }
 
   function renderBatch(b) {
     const name = (id) => state.rubric.axes.find((a) => a.id === id).name;
-    $("bTitle").textContent = `${b.batch}: ${b.tasks.length} task${b.tasks.length === 1 ? "" : "s"} reviewed`;
+    $("bTitle").textContent = `${b.batch}: ${b.tasks.length} task${b.tasks.length === 1 ? "" : "s"} scored`;
     $("bStats").innerHTML = [["Pass rate", pct(b.passRate)], ["Accept", b.accepted], ["Rework", b.rework], ["Reject", b.rejected]]
       .map(([k, v]) => `<div><span class="k">${k}</span><span class="v">${v}</span></div>`).join("");
     const worst = [...b.labellers].sort((x, y) => x.passRate - y.passRate)[0];
     $("bSummary").textContent = b.topIssue
-      ? `The most common failure is ${b.topIssue.name.toLowerCase()}: ${b.topIssue.count} of ${b.tasks.length} tasks at 2 or below. ${worst && worst.passRate < b.passRate ? `${worst.name} has the lowest pass rate at ${pct(worst.passRate)}${worst.topIssue ? `, mostly on ${worst.topIssue.name.toLowerCase()}` : ""}.` : ""}`
+      ? `Top failure: ${b.topIssue.name.toLowerCase()} (${b.topIssue.count} of ${b.tasks.length}).${worst && worst.passRate < b.passRate ? ` Lowest: ${worst.name} at ${pct(worst.passRate)}${worst.topIssue ? `, on ${worst.topIssue.name.toLowerCase()}` : ""}.` : ""}`
       : "No task scored 2 or below on any axis.";
-    $("labBody").innerHTML = b.labellers.map((l) => `<tr><td><b>${esc(l.name)}</b></td><td class="n">${l.tasks}</td><td class="n fig">${pct(l.passRate)}</td><td class="n">${l.rework}</td><td class="n">${l.rejected}</td><td>${l.topIssue ? esc(l.topIssue.name) : `<span class="hint">none</span>`}</td></tr>`).join("");
+    $("labBody").innerHTML = b.labellers.map((l) => `<tr><td><b>${esc(l.name)}</b><span class="tagline m-only">${l.topIssue ? esc(l.topIssue.name) : "no issues"}</span></td><td class="n fig">${pct(l.passRate)} <span class="hint">of ${l.tasks}</span></td><td class="n">${l.rework}</td><td class="n">${l.rejected}</td><td class="d-only">${l.topIssue ? esc(l.topIssue.name) : `<span class="hint">none</span>`}</td></tr>`).join("");
     $("taskBody").innerHTML = b.tasks.map((t, i) => {
       const r = t.result;
-      return `<tr class="pick" tabindex="0" data-i="${i}"><td><b>${esc(t.task_id)}</b></td><td>${esc(t.labeller)}</td><td class="n fig">${r.recommendation.mean.toFixed(2)}</td><td><span class="badge ${r.recommendation.decision}">${LABEL[r.recommendation.decision]}</span></td><td>${esc(name(r.weakest_axis_id))}</td></tr>`;
+      const weak = r.scores.find((x) => x.axis_id === r.weakest_axis_id).score < 5 ? name(r.weakest_axis_id) : "–";
+      return `<tr class="pick" tabindex="0" data-i="${i}"><td><b>${esc(t.task_id)}</b><span class="tagline m-only">${esc(t.labeller)} · ${esc(weak)}</span></td><td class="d-only">${esc(t.labeller)}</td><td class="n fig">${r.recommendation.mean.toFixed(2)}</td><td><span class="badge ${r.recommendation.decision}">${LABEL[r.recommendation.decision]}</span></td><td class="d-only">${esc(weak)}</td></tr>`;
     }).join("");
     $("batchSec").hidden = false;
   }
@@ -1206,7 +1244,8 @@ Reference
     $("tDecision").className = `badge ${r.recommendation.decision}`;
     $("tDecision").textContent = LABEL[r.recommendation.decision];
     $("tMean").textContent = `Mean ${r.recommendation.mean.toFixed(2)} / 5`;
-    $("scores").innerHTML = r.scores.map((sc) => {
+    const na = r.scores.filter((sc) => sc.score == null).map((sc) => axes.get(sc.axis_id).name);
+    $("scores").innerHTML = r.scores.filter((sc) => sc.score != null).map((sc) => {
       const a = axes.get(sc.axis_id);
       const scoreCell = sc.score == null
         ? `<span class="badge na">n/a</span>`
@@ -1214,8 +1253,9 @@ Reference
       const ev = sc.evidence.map((e) => `<blockquote class="${sc.negative ? "neg" : ""}">${esc(e.text)}</blockquote>`).join("");
       return `<tr><td class="axis">${esc(a.name)}<small>${a.kind === "must_have" ? "hard rule" : "fixed axis"}</small></td>
         <td class="score">${scoreCell}</td><td>${ev}<div class="reason">${esc(sc.reasoning)}</div></td></tr>`;
-    }).join("");
+    }).join("") + (na.length ? `<tr><td class="axis">Not triggered<small>hard rules</small></td><td class="score"><span class="badge na">n/a</span></td><td class="reason">${esc(na.join(", "))}: nothing in this task calls for ${na.length === 1 ? "it" : "them"}.</td></tr>` : "");
     $("taskBody").querySelectorAll("tr").forEach((tr) => tr.classList.toggle("on", Number(tr.dataset.i) === i));
+    $("traj").textContent = t.output;
     $("cardSec").hidden = false;
     if (scroll) $("cardSec").scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -1228,13 +1268,12 @@ Reference
     state.playbook = pb;
     const q = (lab, x) => (x ? `<div class="pair"><span class="lab">${lab} · ${esc(x.task)}</span><blockquote class="${lab === "Fails" ? "neg" : ""}">${esc(x.text)}</blockquote></div>` : "");
     $("pb").innerHTML = pb.sections.map((s) => `<section><h4>${esc(s.title)}</h4><ol>${s.items.map((it) => `<li>${esc(it.text)}${it.sub ? `<span class="sub">${esc(it.sub)}</span>` : ""}${it.spec ? `<span class="sub">Spec: “${esc(it.spec)}”</span>` : ""}${q("Passes", it.pass)}${q("Fails", it.fail)}</li>`).join("")}</ol></section>`).join("");
-    $("pbSec").hidden = false;
   }
 
   function run() {
     showError(null);
     const spec = $("spec").value.trim(), csv = $("batch").value.trim();
-    if (!spec || !csv) return showError("Paste a task spec and a batch CSV first.");
+    if (!spec || !csv) return showError("Add a task spec and a batch CSV: paste them below, or upload a CSV.");
     try {
       const t = performance.now();
       const rows = Q.parseCSV(csv);
@@ -1247,6 +1286,7 @@ Reference
       openTask(first >= 0 ? first : 0, false);
       renderPlaybook();
       $("trackMsg").textContent = "";
+      $("inputsMeta").textContent = `${state.demo ? "Demo · " : ""}${state.batch.batch} · ${rows.length} task${rows.length === 1 ? "" : "s"} · ${state.rubric.axes.length - 4} hard rules from “${state.rubric.title}”`;
       $("status").textContent = `${rows.length} task${rows.length === 1 ? "" : "s"} scored in ${Math.max(1, Math.round(performance.now() - t))} ms.`;
     } catch (e) { showError(e.message); }
   }
@@ -1313,7 +1353,7 @@ Reference
     $("attention").innerHTML = bn.length
       ? bn.map((x) => `<li><div class="top"><span class="badge ${x.m.status === "on_track" ? "rework" : x.m.status}">${x.m.status === "on_track" ? `${x.over}d over SLA` : STATUS[x.m.status]}</span><span class="who">${esc(x.b.id)}</span><span>${esc(x.b.name)} · ${esc(x.b.stage)}</span></div><span class="meta">${esc(x.action)}</span></li>`).join("")
       : `<li class="empty">Nothing is over its SLA or at risk of missing a deadline.</li>`;
-    $("stageBody").innerHTML = T.stages(items, now).map((s) => `<tr><td>${s.stage}</td><td class="n">${s.n}</td><td class="n">${s.sla == null ? "–" : s.sla + "d"}</td><td class="n">${s.over ? `<span class="late-t">${s.over}</span>` : "0"}</td></tr>`).join("");
+    $("stageBody").innerHTML = T.stages(items, now).map((s) => `<span class="${s.over ? "late-t" : ""}"><b>${s.n}</b> ${s.stage}${s.sla == null ? "" : ` · ${s.sla}d SLA`}${s.over ? ` · ${s.over} over` : ""}</span>`).join("");
 
     const order = (b) => (T.active(b) ? 0 : 1);
     const rows = [...items].sort((a, b) => order(a) - order(b) || Date.parse(a.deadline) - Date.parse(b.deadline));
@@ -1346,7 +1386,7 @@ Reference
   });
   $("clearDemo").addEventListener("click", () => { trk.items = trk.items.filter((b) => !b.demo); save(); renderTracker(); });
   $("copyNote").addEventListener("click", (e) => copyText($("note").textContent, e.currentTarget, "Copy note"));
-  $("copyCsv").addEventListener("click", (e) => copyText(T.csv(trk.items, Date.now()), e.currentTarget, "Copy as CSV"));
+  $("copyCsv").addEventListener("click", () => download("qa-desk-batches.csv", T.csv(trk.items, Date.now()) + "\n"));
   $("addId").addEventListener("input", (e) => e.target.setCustomValidity(""));
   $("addForm").addEventListener("submit", (e) => {
     e.preventDefault();

@@ -12,7 +12,7 @@ Three numbers above the tabs: this week's pass rate, cost per accepted task, and
 
 ## QA a batch
 
-1. **Input:** a task spec (the labelling or eval guidelines) and a batch of task outputs as CSV (`task_id, batch, labeller, labelled_on, output`), pasted or loaded from a file. Column names are matched loosely; only `output` is required. Each output is a trajectory with one line per turn: `USER:`, `AGENT:`, `TOOL name(arg=value) -> result` and `SUMMARY:`.
+1. **Input:** a task spec (the labelling or eval guidelines) and a batch of task outputs as CSV (`task_id, batch, labeller, labelled_on, output`), pasted or uploaded; **CSV template** downloads a one-row example. Column names are matched loosely; only `output` is required. Each output is a trajectory with one line per turn: `USER:`, `AGENT:`, `TOOL name(arg=value) -> result` and `SUMMARY:`.
 2. **Rubric:** four fixed axes with 1/3/5 anchors: correctness, guideline adherence, completeness and format. Hard rules come from the spec's own lines (up to four). Lines about tone feed guideline adherence, lines about format feed format, and reference lines are listed as such.
 3. **Score:** every axis scores 1–5 and quotes the output line it rests on, copied verbatim. Correctness checks every amount, date and order status the agent states against the tool results, the customer's messages and the spec. A hard rule the task never triggers (no refund, say) shows n/a and stays out of the mean.
 4. **Recommendation:** a fixed rule. Two broken hard rules or a mean under 2.5 rejects. One broken rule, any axis under 3, or a mean under 3.75 sends it to rework. Everything else is accepted.
@@ -32,7 +32,7 @@ The demo is a spec for customer-support agent trajectories (order lookups, cance
   - Timeliness: whether a delivered batch was on time against the customer deadline. An active batch is projected from its current pace plus one final QA pass.
 - **Bottlenecks:** every batch over its stage SLA or projected to miss its deadline, worst first, each with a next action. For example: "needs 8.7 tasks a day and is doing 6.8; move two labellers across or agree a split delivery".
 - **Weekly note:** a plain-text update ready to paste into Slack or email. It covers throughput, quality, cost and timeliness, then the worst bottleneck with its next action and the other flags.
-- **Copy as CSV**, add a batch by hand, or clear the demo. Data is saved in the viewer's browser only (localStorage).
+- **Download CSV**, add a batch by hand, or clear the demo. Data is saved in the viewer's browser only (localStorage).
 
 The demo has six synthetic batches across three clients (Client A to C). B-07 is close to its deadline and over its labelling SLA, B-06 is stuck in QA, and B-05 was delivered a day late. B-07's QA counts match the sample on the first tab.
 
